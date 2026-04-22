@@ -1,4 +1,9 @@
-"""`crew` CLI entry point."""
+"""`crew` CLI entry point.
+
+The router decides between direct mode and a pipeline for every non-flagged
+invocation. ``--direct`` and ``--pipeline`` force the respective modes (per
+CLAUDE.md "Execution Modes").
+"""
 
 from __future__ import annotations
 
@@ -6,6 +11,7 @@ import argparse
 import asyncio
 import sys
 
+from crew import intent_router, pipeline_registry, pipeline_runner
 from crew.direct import run_direct
 
 
@@ -25,22 +31,52 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument(
         "--pipeline",
         action="store_true",
-        help="Force pipeline mode (Day 2+).",
+        help="Force pipeline mode (intent router picks the pipeline).",
     )
     return parser
 
 
+async def _dispatch(prompt: str, *, direct: bool, pipeline: bool, model: str | None) -> None:
+    if direct:
+        await run_direct(prompt, model=model)
+        return
+
+    pipelines = pipeline_registry.discover()
+
+    if pipeline:
+        verdict = await intent_router.route(
+            prompt, pipelines, model=model, require_pipeline=True
+        )
+    else:
+        verdict = await intent_router.route(prompt, pipelines, model=model)
+
+    if verdict.mode == "direct":
+        await run_direct(prompt, model=model)
+        return
+
+    assert verdict.pipeline is not None  # guaranteed by intent_router
+    config = pipeline_registry.load_pipeline(verdict.pipeline)
+    route_dump = {
+        "mode": verdict.mode,
+        "pipeline": verdict.pipeline,
+        "params": verdict.params,
+        "reason": verdict.reason,
+    }
+    await pipeline_runner.run_level_0(
+        config, prompt, verdict.params, model=model, route_result=route_dump
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-
-    if args.pipeline:
-        sys.stderr.write(
-            "--pipeline is not implemented until Day 2 (intent router).\n"
-        )
-        return 2
-
     prompt = " ".join(args.prompt)
-    asyncio.run(run_direct(prompt, model=args.model))
+    try:
+        asyncio.run(
+            _dispatch(prompt, direct=args.direct, pipeline=args.pipeline, model=args.model)
+        )
+    except KeyboardInterrupt:
+        sys.stderr.write("\ninterrupted\n")
+        return 130
     return 0
 
 

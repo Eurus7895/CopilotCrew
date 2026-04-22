@@ -5,7 +5,9 @@ for the full design doc and `AGENTS.md` for session-start orientation.
 
 ## Status
 
-**Day 1 of the build order** — direct mode + harness port + agent loader.
+**Day 2 of the build order** — intent router + Level 0 pipeline runner +
+hook injection points, plus the `daily-standup` pipeline. Direct mode,
+harness port, and agent loader from Day 1 still apply.
 
 ## Install
 
@@ -31,10 +33,16 @@ key. Two options:
 ## Usage
 
 ```bash
-crew "what is 2+2?"                # direct mode (router defaults here in v1)
-crew --direct "summarise this"     # force direct mode
-crew --pipeline "..."              # Day 2+ — currently exits with a notice
+crew "what is 2+2?"                # router → direct mode
+crew "standup prep"                # router → daily-standup pipeline
+crew --direct "summarise this"     # force direct mode (skips the router)
+crew --pipeline "standup prep"     # force pipeline mode (router picks which)
 ```
+
+Pipeline runs write a Markdown summary to
+`~/.crew/outputs/<pipeline>/<timestamp>.md` and a run manifest to
+`~/.crew/plans/<session-id>.json`. See `pipelines/standup/README.md` for the
+first pipeline.
 
 ## Tests
 
