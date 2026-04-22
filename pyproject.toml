@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
-    "github-copilot-sdk @ git+https://github.com/github/copilot-sdk.git#subdirectory=python",
+    "github-copilot-sdk>=0.2.2",
     "pyyaml>=6.0",
 ]
 
@@ -22,9 +22,6 @@ dev = [
 
 [project.scripts]
 crew = "crew.cli:main"
-
-[tool.hatch.metadata]
-allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["crew"]

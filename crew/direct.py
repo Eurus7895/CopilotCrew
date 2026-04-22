@@ -10,10 +10,7 @@ from __future__ import annotations
 import sys
 
 from copilot import CopilotClient
-from copilot.generated.session_events import (
-    AssistantMessageDeltaData,
-    SessionEvent,
-)
+from copilot.generated.session_events import SessionEvent, SessionEventType
 from copilot.session import PermissionHandler
 
 DIRECT_SYSTEM_PROMPT = "You are a helpful team assistant."
@@ -23,9 +20,10 @@ async def run_direct(user_input: str, *, model: str | None = None) -> None:
     """Send `user_input` as a one-shot prompt and stream the reply to stdout."""
 
     def on_event(event: SessionEvent) -> None:
-        match event.data:
-            case AssistantMessageDeltaData() as data:
-                sys.stdout.write(data.delta_content or "")
+        if event.type == SessionEventType.ASSISTANT_MESSAGE_DELTA:
+            delta = getattr(event.data, "delta_content", None)
+            if delta:
+                sys.stdout.write(delta)
                 sys.stdout.flush()
 
     async with CopilotClient() as client:

@@ -13,10 +13,20 @@ for the full design doc and `AGENTS.md` for session-start orientation.
 pip install -e ".[dev]"
 ```
 
-The Copilot SDK is pulled from `github/copilot-sdk` (Python subdirectory). Direct
-mode requires the bundled Copilot CLI binary — install a platform-specific
-wheel of `github-copilot-sdk`, or set `COPILOT_CLI_PATH` to point at an
-existing `copilot` CLI install.
+`github-copilot-sdk>=0.2.2` ships platform wheels that bundle the `copilot`
+CLI binary, so pip picks the right wheel for your OS/arch and you get the
+runtime with no extra steps. Override with `COPILOT_CLI_PATH` to point at an
+existing install.
+
+## Authentication
+
+Direct mode needs either a GitHub Copilot subscription or a BYOK provider
+key. Two options:
+
+1. **GitHub Copilot** — run `copilot` once and sign in; the SDK picks up the
+   cached credential automatically on the next `crew` invocation.
+2. **BYOK** — set `GITHUB_TOKEN`, or pass a `ProviderConfig` (Anthropic,
+   Azure, custom endpoint) to the SDK. See the Copilot SDK docs.
 
 ## Usage
 
