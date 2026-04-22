@@ -5,9 +5,10 @@ for the full design doc and `AGENTS.md` for session-start orientation.
 
 ## Status
 
-**Day 2 of the build order** — intent router + Level 0 pipeline runner +
-hook injection points, plus the `daily-standup` pipeline. Direct mode,
-harness port, and agent loader from Day 1 still apply.
+**Day 2.5 of the build order** — intent router is now 3-way (direct /
+agent / pipeline), with standalone agent dispatch and the `agents/`
+directory on top of Day 2's pipeline runner, hook registry, and
+`daily-standup` pipeline.
 
 ## Install
 
@@ -34,12 +35,19 @@ key. Two options:
 
 ```bash
 crew "what is 2+2?"                # router → direct mode
+crew "fix the flaky test in foo.py" # router → agent:coder (auto-summoned)
 crew "standup prep"                # router → daily-standup pipeline
 crew --direct "summarise this"     # force direct mode (skips the router)
+crew --agent coder "refactor X"    # force a specific standalone agent
 crew --pipeline "standup prep"     # force pipeline mode (router picks which)
 ```
 
-Pipeline runs write a Markdown summary to
+**Agents** (`agents/*.md`) are persona swaps: one LLM call like direct
+mode, but with the agent's system prompt. No output file, no plan JSON.
+The intent router auto-summons the best-matching agent based on the
+frontmatter `description`. See `agents/coder.md` for the format.
+
+**Pipelines** are governed workflows. Runs write a Markdown summary to
 `~/.crew/outputs/<pipeline>/<timestamp>.md` and a run manifest to
 `~/.crew/plans/<session-id>.json`. See `pipelines/standup/README.md` for the
 first pipeline.

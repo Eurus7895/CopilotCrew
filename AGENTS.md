@@ -6,10 +6,14 @@ the Copilot SDK. Read `CLAUDE.md` for the full design doc.
 ## Project shape
 
 - `crew/cli.py` — `crew "<prompt>"` entry point; dispatches via the intent
-  router unless `--direct` / `--pipeline` forces a mode
-- `crew/direct.py` — direct mode: single LLM call, no pipeline, no governance
-- `crew/intent_router.py` — one classifier LLM call → `direct` or
-  `pipeline:{name}`; falls back to direct on any failure
+  router unless `--direct` / `--agent NAME` / `--pipeline` forces a mode
+- `crew/direct.py` — direct mode: single LLM call, no pipeline, no
+  governance. Accepts an optional `agent_prompt` to swap the system message
+  for a standalone-agent persona
+- `crew/intent_router.py` — one classifier LLM call → `direct`,
+  `agent:{name}`, or `pipeline:{name}`; falls back to direct on any failure
+- `crew/agent_registry.py` — discovers `agents/*.md` files and loads the
+  resolved `AgentConfig` (shared by standalone + subagent callers)
 - `crew/pipeline_registry.py` — discovers `pipelines/*/pipeline.yaml` and
   loads the resolved `PipelineConfig`
 - `crew/pipeline_runner.py` — Level 0 execution; fires lifecycle hooks
@@ -18,19 +22,28 @@ the Copilot SDK. Read `CLAUDE.md` for the full design doc.
 - `crew/sdk/` — thin wrappers over the Copilot SDK
 - `crew/harness/` — ported from `Eurus7895/CopilotHarness@dev`; dormant in
   Level 0, activated by the Day 3+ correction loop
+- `agents/` — flat directory of standalone / subagent-capable persona
+  files. One `.md` per agent (e.g. `agents/coder.md`)
 - `pipelines/` — self-contained pipeline directories; currently
   `pipelines/standup/` (Level 0)
 
-## Two modes
+## Three modes
 
-The intent router classifies every request as `direct` or `pipeline:{name}`.
-Direct mode is the fast path — one Copilot SDK call, MCP available, streamed
-to terminal. Pipelines are governed (Level 0 runs a single generator with
-hooks + plan JSON; Level 1+ adds an isolated evaluator on Day 3). See
-CLAUDE.md "Agent Complexity Model".
+The intent router classifies every request as `direct`, `agent:{name}`, or
+`pipeline:{name}`.
+
+- **Direct** — one Copilot SDK call with a generic assistant prompt, MCP
+  available, streamed to terminal. No output file.
+- **Agent** — one Copilot SDK call with a persona's prompt (`agents/*.md`).
+  Like direct mode, but with a specialised system message. No output file.
+- **Pipeline** — governed workflow. Level 0 runs a single generator with
+  hooks + plan JSON; Level 1+ adds an isolated evaluator on Day 3.
+
+See CLAUDE.md "Agent Complexity Model".
 
 ## Build status
 
-Currently on **Day 2** of the build order. Intent router, pipeline registry,
-Level 0 runner, hook injection points, and the `daily-standup` pipeline have
-landed. Day 3+ adds the evaluator and correction loop.
+Currently on **Day 2.5** of the build order. Intent router upgraded to
+3-way classification (direct / agent / pipeline), standalone agent
+dispatch, and the `agents/` directory have landed on top of Day 2. Day 3+
+adds the evaluator, correction loop, and subagent spawning.
