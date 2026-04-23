@@ -60,6 +60,11 @@ async def _dispatch_slash(prompt: str, *, model: str | None) -> None:
     as the user input. Direct mode is used (no agent persona, no pipeline
     governance). Unknown skills exit with code 2 and list the available
     commands.
+
+    ``/help`` is a built-in: it prints the local registry (pipelines,
+    standalone agents, skills) without calling the SDK. The built-in
+    shadows any user-defined ``skills/help/`` so help output is always
+    deterministic.
     """
     name, _, rest = prompt[1:].partition(" ")
     name = name.strip()
@@ -67,6 +72,10 @@ async def _dispatch_slash(prompt: str, *, model: str | None) -> None:
 
     if not name:
         _slash_usage_error("empty command after /")
+        return
+
+    if name == "help":
+        _print_help()
         return
 
     try:
@@ -79,19 +88,70 @@ async def _dispatch_slash(prompt: str, *, model: str | None) -> None:
 
 
 def _available_slash_commands() -> list[str]:
-    return sorted(s.name for s in skill_registry.discover())
+    names = {s.name for s in skill_registry.discover()}
+    names.add("help")
+    return sorted(names)
 
 
 def _slash_usage_error(msg: str) -> None:
     available = _available_slash_commands()
     sys.stderr.write(f"crew: {msg}\n")
-    if available:
-        sys.stderr.write(
-            "available skills: " + ", ".join(f"/{c}" for c in available) + "\n"
-        )
-    else:
-        sys.stderr.write("no skills registered (add one under skills/<name>/SKILL.md)\n")
+    sys.stderr.write(
+        "available commands: " + ", ".join(f"/{c}" for c in available) + "\n"
+    )
+    sys.stderr.write("try `/help` to list pipelines, agents, and skills\n")
     raise SystemExit(2)
+
+
+def _print_help() -> None:
+    """Print discovered pipelines, standalone agents, and skills.
+
+    Zero LLM cost — straight registry walk, written to stdout. Empty
+    sections are shown explicitly so the user can tell the registry was
+    actually consulted (vs. a silent failure).
+    """
+    pipelines = pipeline_registry.discover()
+    agents = [a for a in agent_registry.discover() if a.standalone]
+    skills = skill_registry.discover()
+
+    out = sys.stdout
+
+    out.write("Crew — what's available in this project\n")
+    out.write("=" * 40 + "\n\n")
+
+    out.write("Pipelines (governed workflows; `crew \"<intent>\"`)\n")
+    if pipelines:
+        for p in pipelines:
+            desc = p.description or "(no description)"
+            out.write(f"  {p.name} — Level {p.level} — {desc}\n")
+    else:
+        out.write("  (none registered — add one under pipelines/<name>/)\n")
+    out.write("\n")
+
+    out.write("Agents (persona swap; `crew --agent NAME` or auto-summoned)\n")
+    if agents:
+        for a in agents:
+            desc = a.description or "(no description)"
+            out.write(f"  {a.name} — {desc}\n")
+    else:
+        out.write("  (none registered — add one under agents/<name>.md)\n")
+    out.write("\n")
+
+    out.write("Skills (capability injection; `/<skill-name> <args>`)\n")
+    if skills:
+        for s in skills:
+            desc = s.description or "(no description)"
+            out.write(f"  /{s.name} — {desc}\n")
+    else:
+        out.write("  (none registered — add one under skills/<name>/SKILL.md)\n")
+    out.write("\n")
+
+    out.write("Other modes:\n")
+    out.write("  crew \"<prompt>\"          → router picks direct / agent / pipeline\n")
+    out.write("  crew --direct \"<prompt>\" → force direct mode (single LLM call)\n")
+    out.write("  crew --pipeline \"<x>\"    → force pipeline mode\n")
+    out.write("  /help                    → this listing (zero LLM cost)\n")
+    out.flush()
 
 
 async def _dispatch(

@@ -330,3 +330,54 @@ def test_pipeline_flag_with_slash_still_uses_router(spies):
     # Router IS called because --pipeline was passed; slash is ignored.
     assert len(spies["router"].called_with) == 1
     assert len(spies["runner"].called_with) == 1
+
+
+# ── /help built-in ───────────────────────────────────────────────────────────
+
+
+def test_slash_help_prints_registry_and_skips_sdk(spies, capsys):
+    rc = cli.main(["/help"])
+    assert rc == 0
+    # No SDK call on any path.
+    assert spies["direct"].called_with == []
+    assert spies["router"].called_with == []
+    assert spies["runner"].called_with == []
+
+    out = capsys.readouterr().out
+    # All three sections appear, populated from the mocked discoveries.
+    assert "Pipelines" in out
+    assert "daily-standup" in out
+    assert "Level 0" in out
+    assert "Agents" in out
+    assert "coder" in out
+    # Non-standalone agents are filtered out.
+    assert "internal-only" not in out
+    assert "Skills" in out
+    assert "/debug" in out
+
+
+def test_slash_help_extra_args_ignored(spies, capsys):
+    # `/help anything else` still prints the registry — extra args are no-ops
+    # because /help is a deterministic dispatcher, not a skill.
+    rc = cli.main(["/help", "pipelines"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "Pipelines" in out
+    assert spies["direct"].called_with == []
+
+
+def test_slash_unknown_skill_advertises_help(spies, capsys):
+    with pytest.raises(SystemExit):
+        cli.main(["/nope"])
+    err = capsys.readouterr().err
+    assert "/help" in err
+
+
+def test_slash_help_works_with_empty_skill_registry(monkeypatch, spies, capsys):
+    monkeypatch.setattr(skill_registry, "discover", lambda *a, **k: [])
+    rc = cli.main(["/help"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    # Pipelines + agents still listed; skills section is shown but empty.
+    assert "daily-standup" in out
+    assert "(none registered" in out
