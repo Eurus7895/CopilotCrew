@@ -511,6 +511,12 @@ agent loader.
     config.yaml                  auth, model, output preferences
     sessions.json                per-scope Copilot session_id cache (Day 4-A)
     conversations/<scope>.jsonl  per-scope turn log (audit trail; Day 4-A)
+    memory.jsonl                 remembered facts for the GUI right rail
+                                 (Phase 7; hooks + future pipelines append)
+    gui/                         JSONL stubs the dashboard reads for
+                                 timeline, PR activity, Slack mentions,
+                                 working-on chips (Phase 7; seeded on
+                                 first `crew gui` run)
 ```
 
 Env vars affecting state:
@@ -693,8 +699,19 @@ format (see Phase 2). No migration.
 ### Phase 6 — SSO / Enterprise Auth (Month 4+)
 Only after team adoption proven.
 
-### Phase 7 — Web Dashboard (Month 6+)
-Read-only view of logs.db + plans/. FastAPI + HTMX. CLI remains primary.
+### Phase 7 — Web Dashboard (shipped alongside Day 4-A)
+FastAPI + Jinja2 + HTMX + vanilla CSS, optional `[gui]` extra,
+launched via `crew gui`. Three panes: pinned rail (real registries)
++ day timeline, center cards (PR activity, Slack mentions, standup
+draft), right rail working-on chips + remembered facts. Live data:
+pinned rail + standup draft from `~/.crew/outputs/daily-standup/`.
+Stub JSONL data: `~/.crew/gui/{timeline,pr_activity,slack_mentions,
+working_on}.jsonl` and `~/.crew/memory.jsonl`, seeded on first run so
+future hooks/pipelines can append without GUI changes. Regenerate
+re-runs the `daily-standup` pipeline with stdout captured into an SSE
+bus; a module-level lock blocks concurrent runs. Binds `127.0.0.1`;
+no auth in v1. "Post to #standup" is wired only to the UI — Slack
+integration is deferred. CLI remains primary.
 
 ---
 
@@ -746,10 +763,13 @@ architecture primitives, different execution model.
 ```
 ❌ Level 2 pipelines         ❌ Pipeline marketplace
 ❌ Auto-invoke skills        ❌ Executable hooks (beyond Python scripts)
-❌ Web dashboard             ❌ SSO / enterprise auth
-❌ Cloud deployment          ❌ Multi-user sessions
-❌ More than 5 pipelines     ❌ context_budget enforcement
+❌ SSO / enterprise auth     ❌ Cloud deployment
+❌ Multi-user sessions       ❌ More than 5 pipelines
+❌ context_budget enforcement
 ```
+
+Note: the local web dashboard was originally listed here as "not in v1"
+but shipped alongside Day 4-A. See **Phase 7 — Web Dashboard** above.
 
 ---
 
@@ -767,6 +787,6 @@ architecture primitives, different execution model.
 
 *Updated: April 2026*
 *Product: Crew*
-*Phase: Day 4-A shipped; Day 4-B next*
+*Phase: Day 4-A + GUI (Phase 7) shipped; Day 4-B next*
 *First user: Current team*
 *Next: Day 4-B — streamer + remaining pipelines (ticket-refinement, code-review-routing, release-notes)*

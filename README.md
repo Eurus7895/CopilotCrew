@@ -5,21 +5,24 @@ for the full design doc and `AGENTS.md` for session-start orientation.
 
 ## Status
 
-**Day 4-A of the build order.** Level 1 pipelines ship with an isolated
-evaluator + correction loop (`pipelines/incident-triage/`); direct + agent
-+ slash modes auto-resume their per-(cwd, mode, [agent|skill]) Copilot
-session and rotate silently every ~20 turns (`--new` starts fresh).
-Sits on top of Day 3 (evaluator + `incident-triage`), Day 2.8 (slash
-commands invoke skills; `skills/debug/`), Day 2.5's 3-way intent router
-(direct / agent / pipeline), and Day 2's pipeline runner + hook registry.
-Pipelines and the evaluator are always one-shot (CLAUDE.md principle #2).
-Plugin bundles (shareable directories of skills) are roadmapped for
-Phase 2+.
+**Day 4-A of the build order, plus the web GUI.** Level 1 pipelines ship
+with an isolated evaluator + correction loop (`pipelines/incident-triage/`);
+direct + agent + slash modes auto-resume their per-(cwd, mode, [agent|skill])
+Copilot session and rotate silently every ~20 turns (`--new` starts fresh).
+A local FastAPI dashboard (`crew gui`) renders a three-pane "always-open
+pane" with pinned commands, a day timeline, the latest standup draft, and
+a remembered-facts panel. Sits on top of Day 3 (evaluator +
+`incident-triage`), Day 2.8 (slash commands invoke skills; `skills/debug/`),
+Day 2.5's 3-way intent router (direct / agent / pipeline), and Day 2's
+pipeline runner + hook registry. Pipelines and the evaluator are always
+one-shot (CLAUDE.md principle #2). Plugin bundles (shareable directories
+of skills) are roadmapped for Phase 2+.
 
 ## Install
 
 ```bash
-pip install -e ".[dev]"
+pip install -e ".[dev]"          # CLI only
+pip install -e ".[dev,gui]"      # CLI + local web dashboard
 ```
 
 `github-copilot-sdk>=0.2.2` ships platform wheels that bundle the `copilot`
@@ -50,6 +53,7 @@ crew --direct "summarise this"       # force direct mode (skips the router)
 crew --agent coder "refactor X"      # force a specific standalone agent
 crew --pipeline "standup prep"       # force pipeline mode (router picks which)
 crew --new "different topic"         # drop cached memory, start fresh
+crew gui [--open] [--port 8765]      # launch the local web dashboard
 ```
 
 **Slash commands** (`/<skill>`) invoke a skill from `skills/<name>/SKILL.md`.
@@ -92,6 +96,38 @@ in `~/.crew/sessions.json` and turns are appended to
 the tail and starts a fresh SDK session seeded with the summary.
 `--new` forces fresh; `CREW_SUMMARY_MODEL` selects a cheaper model
 for the summary call. Pipelines and the evaluator **never** resume.
+
+## GUI
+
+A local web dashboard lives at `crew/gui/` and ships as the optional
+`[gui]` extra (FastAPI + Jinja2 + HTMX + vanilla CSS, no build step).
+
+```bash
+pip install -e ".[gui]"
+crew gui --open                  # http://127.0.0.1:8765, opens a browser
+crew gui --port 9000 --model gpt-4o
+```
+
+Three panes:
+
+- **Left rail** — pinned slash commands / agents / pipelines drawn from the
+  real registries, plus a day timeline (morning, proactive nudge, pair
+  programming, meeting prep, end of day).
+- **Center** — a "Good morning" greeting, cards for overnight PR activity
+  and Slack mentions, the latest daily-standup draft (live from
+  `~/.crew/outputs/daily-standup/`), and an action row. *Post to #standup*
+  is disabled until Slack integration lands; *Regenerate* re-runs the
+  daily-standup pipeline server-side and streams progress over SSE;
+  *Edit draft* opens the output in `$EDITOR`; *Skip today* deletes the
+  latest draft.
+- **Right rail** — "Working on" chips, the timeline mirror, and Recent
+  Facts pulled from `~/.crew/memory.jsonl`.
+
+Aspirational data (timeline events, remembered facts, PR/Slack cards,
+working-on chips) read from JSONL files seeded into `~/.crew/gui/` and
+`~/.crew/memory.jsonl` on first launch. Edit them by hand or let future
+hooks/pipelines append — the GUI picks up changes on next request with no
+code change. The server binds `127.0.0.1` only; no auth in v1.
 
 ## Tests
 

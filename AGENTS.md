@@ -49,6 +49,18 @@ the Copilot SDK. Read `CLAUDE.md` for the full design doc.
 - `pipelines/` — self-contained pipeline directories;
   `pipelines/standup/` (Level 0) and `pipelines/incident-triage/`
   (Level 1, generator + evaluator + correction loop)
+- `crew/gui/` — optional local web dashboard (`[gui]` extra), launched
+  via `crew gui`. FastAPI + Jinja2 + HTMX + vanilla CSS, no build step.
+  Routes under `crew/gui/routes/`, bridge logic in `crew/gui/services/`
+  (`pinned`, `mocks`, `standup_service`, `status_service`, `editor`,
+  `events_bus`, `bootstrap`). Pinned rail and the standup card are live
+  over real registries + `~/.crew/outputs/daily-standup/`; timeline,
+  facts, PR/Slack cards, and working-on chips read JSONL stubs seeded
+  into `~/.crew/gui/` and `~/.crew/memory.jsonl`. Pipeline invocation
+  reuses `pipeline_runner.run_pipeline` with stdout redirected into an
+  SSE pub/sub; a module lock blocks concurrent runs. Copilot SDK imports
+  inside `standup_service` are lazy so the GUI boots even without the
+  SDK for read-only use
 
 ## Three modes + skill invocation
 
@@ -91,15 +103,22 @@ See CLAUDE.md "Agent Complexity Model" and "Phase 5 — Plugin Marketplace".
 
 ## Build status
 
-**Day 4-A shipped.** Bounded session continuity for chatty modes:
-`crew/conversations.py` persists the per-scope Copilot `session_id` in
-`~/.crew/sessions.json` and appends every turn to a rotation-input log;
-once `CREW_TURN_CAP` is hit, the next call silently summarises the tail
-(via `CREW_SUMMARY_MODEL` when set, else the user's model), starts a
-fresh SDK session seeded with the summary, and marks the rotation in
-the log. One user-facing flag: `--new` to force fresh. Pipelines + the
-evaluator stay one-shot — guarded by runtime tests asserting no
-`session_id` is ever passed to `create_session` from the runner.
+**Day 4-A shipped, plus the web GUI (Phase 7) ahead of schedule.**
+Bounded session continuity for chatty modes: `crew/conversations.py`
+persists the per-scope Copilot `session_id` in `~/.crew/sessions.json`
+and appends every turn to a rotation-input log; once `CREW_TURN_CAP` is
+hit, the next call silently summarises the tail (via
+`CREW_SUMMARY_MODEL` when set, else the user's model), starts a fresh
+SDK session seeded with the summary, and marks the rotation in the log.
+One user-facing flag: `--new` to force fresh. Pipelines + the evaluator
+stay one-shot — guarded by runtime tests asserting no `session_id` is
+ever passed to `create_session` from the runner.
+
+The GUI landed alongside Day 4-A: `crew gui` launches a three-pane
+FastAPI dashboard (left rail pinned items + day timeline, center
+cards + standup draft, right rail memory/facts). Read-only viewer
+plus a launcher for the daily-standup pipeline — no new pipelines,
+no new backend concepts. CLI remains primary.
 
 Earlier days, in order: Day 2 (pipeline runner + hooks +
 `daily-standup`), Day 2.5 (3-way router + `agents/` directory), Day 2.8
