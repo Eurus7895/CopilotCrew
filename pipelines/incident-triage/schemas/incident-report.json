@@ -1,0 +1,30 @@
+{
+  "required_sections": [
+    "Summary",
+    "Timeline",
+    "Suspected Causes",
+    "Next Actions"
+  ],
+  "rules": [
+    {
+      "check": "every_cause_cites_evidence",
+      "message": "Every entry under '## Suspected Causes' MUST cite at least one concrete piece of evidence (commit SHA, CI run id, PR number, or release tag)."
+    },
+    {
+      "check": "every_action_has_owner",
+      "message": "Every entry under '## Next Actions' MUST include an 'OWNER:' field. 'OWNER: TBD' is acceptable; omitting the field is not."
+    },
+    {
+      "check": "no_invented_activity",
+      "message": "If a GitHub MCP call returned no matching events, the report MUST say so explicitly in the relevant section. The generator MUST NOT fabricate commits, runs, or releases."
+    },
+    {
+      "check": "summary_is_short",
+      "message": "The '## Summary' section MUST be 2-3 sentences."
+    },
+    {
+      "check": "report_is_short",
+      "message": "The whole report MUST stay under 400 words."
+    }
+  ]
+}

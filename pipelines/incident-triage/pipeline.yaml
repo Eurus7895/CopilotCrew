@@ -1,0 +1,17 @@
+name: incident-triage
+description: >
+  Triage a production incident: gather evidence (recent commits, failing CI
+  runs, recent releases) and produce a structured incident report. Level 1
+  pipeline — generator output is graded by an isolated evaluator and retried
+  with fix instructions on failure.
+level: 1
+agent: agents/generator.md
+evaluator: agents/evaluator.md
+schema: schemas/incident-report.json
+mcp:
+  - github
+allowed_tools:
+  - read
+  - shell
+  - mcp
+output_subdir: incident-triage

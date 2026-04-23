@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 
 import pytest
@@ -10,10 +11,12 @@ FIXTURES_PIPELINES = Path(__file__).parent / "fixtures" / "pipelines"
 
 def test_discover_returns_demo_pipeline() -> None:
     infos = pipeline_registry.discover(FIXTURES_PIPELINES)
-    names = [info.name for info in infos]
-    assert names == ["demo"]
-    assert infos[0].level == 0
-    assert "Fixture pipeline" in infos[0].description
+    names = sorted(info.name for info in infos)
+    assert names == ["demo", "demo-l1"]
+    by_name = {i.name: i for i in infos}
+    assert by_name["demo"].level == 0
+    assert "Fixture pipeline" in by_name["demo"].description
+    assert by_name["demo-l1"].level == 1
 
 
 def test_discover_skips_subdir_without_pipeline_yaml(tmp_path: Path) -> None:
@@ -80,3 +83,48 @@ def test_load_pipeline_resolves_repo_root_for_mcp(tmp_path: Path) -> None:
         repo_root=tmp_path,
     )
     assert config.mcp_servers == {}
+
+
+def test_level_0_pipeline_has_no_evaluator() -> None:
+    config = pipeline_registry.load_pipeline(
+        "demo", pipelines_dir=FIXTURES_PIPELINES
+    )
+    # Level 0 pipelines silently omit the evaluator when missing.
+    assert config.evaluator_path is None
+    assert config.evaluator_prompt is None
+    assert config.schema_text is None
+
+
+def test_load_demo_l1_surfaces_evaluator_and_schema() -> None:
+    config = pipeline_registry.load_pipeline(
+        "demo-l1", pipelines_dir=FIXTURES_PIPELINES
+    )
+    assert config.level == 1
+    assert config.evaluator_path is not None
+    assert config.evaluator_prompt is not None
+    assert "JSON" in config.evaluator_prompt
+    assert config.schema_path is not None
+    assert config.schema_text is not None
+    assert "Summary" in config.schema_text
+
+
+def test_load_level1_missing_evaluator_raises(tmp_path: Path) -> None:
+    src = FIXTURES_PIPELINES / "demo-l1"
+    dst_root = tmp_path / "pipelines"
+    dst = dst_root / "demo-l1"
+    shutil.copytree(src, dst)
+    (dst / "agents" / "evaluator.md").unlink()
+
+    with pytest.raises(FileNotFoundError, match="evaluator file missing"):
+        pipeline_registry.load_pipeline("demo-l1", pipelines_dir=dst_root)
+
+
+def test_load_pipeline_missing_schema_file_raises(tmp_path: Path) -> None:
+    src = FIXTURES_PIPELINES / "demo-l1"
+    dst_root = tmp_path / "pipelines"
+    dst = dst_root / "demo-l1"
+    shutil.copytree(src, dst)
+    (dst / "schemas" / "output.json").unlink()
+
+    with pytest.raises(FileNotFoundError, match="schema file missing"):
+        pipeline_registry.load_pipeline("demo-l1", pipelines_dir=dst_root)

@@ -20,19 +20,28 @@ the Copilot SDK. Read `CLAUDE.md` for the full design doc.
 - `crew/skill_registry.py` — discovers `skills/<name>/SKILL.md` bundles
   (instructions + optional `scripts/` and `references/`). Skills are
   invoked by slash commands and appended to the session's system message
-- `crew/pipeline_runner.py` — Level 0 execution; fires lifecycle hooks
+- `crew/pipeline_runner.py` — Level 0 + Level 1 execution; `run_pipeline`
+  dispatches by `config.level`. Fires lifecycle hooks (including
+  `on-eval-fail` / `on-escalate` for Level 1)
+- `crew/evaluator.py` — isolated evaluator session for Level 1 pipelines.
+  Fresh `CopilotClient`, no MCP, no tools — receives only the generator
+  output text + the pipeline's schema/criteria. Returns a strict JSON
+  verdict (`status`, `issues`, `summary`) parsed defensively
 - `crew/hooks.py` — in-process hook registry (`session-start`,
   `pre-tool-use`, `post-tool-use`, `on-eval-fail`, `on-escalate`, `post-run`)
 - `crew/sdk/` — thin wrappers over the Copilot SDK
-- `crew/harness/` — ported from `Eurus7895/CopilotHarness@dev`; dormant in
-  Level 0, activated by the Day 3+ correction loop
+- `crew/harness/` — ported from `Eurus7895/CopilotHarness@dev`. The
+  Day 3 Level 1 loop is Copilot-SDK-native inside `pipeline_runner`;
+  the SQLite-stage modules (`correction_loop.py`, `state.py`, …) remain
+  dormant until a future workflow needs cross-stage state
 - `agents/` — flat directory of standalone / subagent-capable persona
   files. One `.md` per agent (e.g. `agents/coder.md`)
 - `skills/` — directory of skill bundles. Each skill is
   `skills/<name>/SKILL.md` plus optional `references/` and `scripts/`
   subdirectories. Currently: `skills/debug/`
-- `pipelines/` — self-contained pipeline directories; currently
-  `pipelines/standup/` (Level 0)
+- `pipelines/` — self-contained pipeline directories;
+  `pipelines/standup/` (Level 0) and `pipelines/incident-triage/`
+  (Level 1, generator + evaluator + correction loop)
 
 ## Three modes + skill invocation
 
@@ -44,7 +53,10 @@ The intent router classifies every non-slash, non-flagged request as
 - **Agent** — one Copilot SDK call with a persona's prompt (`agents/*.md`).
   Like direct mode, but with a specialised system message. No output file.
 - **Pipeline** — governed workflow. Level 0 runs a single generator with
-  hooks + plan JSON; Level 1+ adds an isolated evaluator on Day 3.
+  hooks + plan JSON; Level 1 adds an isolated evaluator session
+  (`crew/evaluator.py`) and a correction loop with up to 3 attempts
+  before escalation. Level 2+ is gated on observed Level 1 failures and
+  is not in v1.
 
 **Slash commands** (`/<skill-name>`) invoke a skill. The skill's
 instructions are appended to the session's system message so the call
@@ -64,9 +76,19 @@ See CLAUDE.md "Agent Complexity Model" and "Phase 5 — Plugin Marketplace".
 
 ## Build status
 
-Currently on **Day 2.8** of the build order. Slash commands now invoke
-skills (`skills/<name>/SKILL.md`) instead of dispatching to agents or
-pipelines; `skills/debug/` ships as the first shipped skill. This sits on
-top of Day 2.5 (3-way router + `agents/` directory) and Day 2 (pipeline
-runner + hooks + `daily-standup`). Day 3+ adds the evaluator, correction
-loop, and subagent spawning.
+**Day 3 shipped.** Level 1 pipelines now run with an isolated evaluator
+session + correction loop: `crew/evaluator.py` runs a fresh
+`CopilotClient` (no MCP, no tools) that grades the generator's output
+against the pipeline's schema and returns a strict JSON verdict.
+`pipeline_runner.run_level_1` retries the generator with the verdict's
+fix instructions appended, up to 3 attempts; `on-eval-fail` fires per
+failed attempt and `on-escalate` fires once on exhaustion or a hard
+`status: escalate` verdict. `pipeline_runner.run_pipeline` is the new
+dispatcher (replaces direct `run_level_0` calls in the CLI).
+`pipelines/incident-triage/` ships as the first Level 1 pipeline.
+
+Earlier days, in order: Day 2 (pipeline runner + hooks +
+`daily-standup`), Day 2.5 (3-way router + `agents/` directory), Day 2.8
+(slash commands invoke skills; `skills/debug/`). Day 4+ adds the
+remaining pipelines (ticket-refinement, code-review-routing,
+release-notes), the streamer, and subagent spawning.

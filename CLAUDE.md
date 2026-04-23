@@ -565,11 +565,33 @@ before Day 3's evaluator work:
 
 ### Day 3 — Evaluator + incident-triage (Level 1)
 ```
-[ ] evaluator.py: separate CopilotClient factory + verdict parser
-[ ] pipeline_runner.py Level 1 execution with isolated evaluator
-[ ] Hook injection: on-eval-fail, on-escalate
-[ ] Test: evaluator grades in fresh session, correction loop fires
+[x] evaluator.py: separate CopilotClient factory + verdict parser
+[x] pipeline_runner.py Level 1 execution with isolated evaluator
+[x] Hook injection: on-eval-fail, on-escalate
+[x] Test: evaluator grades in fresh session, correction loop fires
 ```
+
+Implementation notes:
+
+* The evaluator receives the generator's output **text** inline, not a
+  file path. Its session has no MCP and no permission handler, so it
+  cannot read files anyway — passing the path would buy nothing. This
+  stays faithful to "fresh eyes, fresh context".
+* Evaluator session uses `enable_config_discovery=False`. No MCP, no
+  skill, no tools. System message is `evaluator_prompt` plus the
+  pipeline's `schema_text`, in `replace` mode.
+* Each attempt's output is preserved on disk
+  (`~/.crew/outputs/<pipeline>/<ts>-<uid>-attempt{N}.md`) so a failed
+  run is auditable. The single per-run plan JSON contains the full
+  `attempts` array (per-attempt verdict, output path, timestamps) and
+  an `escalated` flag.
+* `run_pipeline(config, ...)` dispatches by `config.level` (0 → Level
+  0; 1 → Level 1; 2+ → ValueError). The CLI now calls `run_pipeline`
+  exclusively; `run_level_0` / `run_level_1` stay exported for tests.
+* `crew/harness/correction_loop.py` (the SQLite-stage harness ported
+  from CopilotHarness) stays dormant — its plan→design→code→review
+  contract doesn't fit the generator/evaluator loop. The Day 3 loop
+  lives inside `pipeline_runner.run_level_1` instead.
 
 ### Day 4 — Streaming + remaining pipelines
 ```
@@ -693,6 +715,6 @@ architecture primitives, different execution model.
 
 *Updated: April 2026*
 *Product: Crew*
-*Phase: Day 2.8 shipped; Day 3 next*
+*Phase: Day 3 shipped; Day 4 next*
 *First user: Current team*
-*Next: Day 3 — evaluator + incident-triage (Level 1)*
+*Next: Day 4 — streamer + remaining pipelines (ticket-refinement, code-review-routing, release-notes)*

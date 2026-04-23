@@ -147,7 +147,7 @@ async def _dispatch(
         "params": verdict.params,
         "reason": verdict.reason,
     }
-    await pipeline_runner.run_level_0(
+    await pipeline_runner.run_pipeline(
         config, prompt, verdict.params, model=model, route_result=route_dump
     )
 
