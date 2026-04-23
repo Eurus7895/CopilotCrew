@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Crew — your coworker</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <main class="page">
+    <header class="page-head">
+      <h1>Crew &mdash; your coworker</h1>
+      <p class="tagline">
+        An always-open pane. Warm but professional. Crew greets you,
+        nudges when it matters, watches your tests, preps you for 1:1s,
+        and wraps your day. Click the left rail to scrub through a day.
+      </p>
+    </header>
+
+    <section class="window" id="window">
+      <div class="window-chrome">
+        <span class="traffic red" aria-hidden="true"></span>
+        <span class="traffic yellow" aria-hidden="true"></span>
+        <span class="traffic green" aria-hidden="true"></span>
+        <div class="window-title">Crew</div>
+      </div>
+
+      <div class="window-body">
+        {% include "partials/left_rail.html" %}
+        <section class="center" id="center" aria-label="Current moment">
+          {% include "partials/center_home.html" %}
+        </section>
+        {% include "partials/right_rail.html" %}
+      </div>
+    </section>
+  </main>
+
+  <div id="flash" class="flash" aria-live="polite"></div>
+</body>
+</html>

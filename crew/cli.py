@@ -362,7 +362,45 @@ async def _dispatch(
     )
 
 
+def _run_gui(argv: list[str]) -> int:
+    """Dispatch the ``gui`` subcommand.
+
+    Lazy-imports ``crew.gui`` so the base install keeps working without the
+    ``[gui]`` extra. If FastAPI/uvicorn/etc. are missing we print a clear
+    install hint and exit 2.
+    """
+    parser = argparse.ArgumentParser(prog="crew gui")
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument(
+        "--open",
+        action="store_true",
+        help="Open a browser on launch.",
+    )
+    parser.add_argument("--model", default=None, help="Override the model label.")
+    ns = parser.parse_args(argv)
+
+    try:
+        from crew.gui.server import run_server
+    except ImportError:
+        sys.stderr.write(
+            "crew gui requires the 'gui' extra:\n"
+            "  pip install 'crew[gui]'\n"
+        )
+        return 2
+
+    run_server(host=ns.host, port=ns.port, open_browser=ns.open, model=ns.model)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv[1:]) if argv is None else list(argv)
+    # Intercept the ``gui`` subcommand before argparse runs on the root
+    # parser (which treats ``prompt`` as required). Everything else flows
+    # through the existing dispatch unchanged.
+    if argv and argv[0] == "gui":
+        return _run_gui(argv[1:])
+
     args = build_parser().parse_args(argv)
     prompt = " ".join(args.prompt)
     try:

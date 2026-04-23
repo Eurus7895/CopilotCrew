@@ -1,0 +1,27 @@
+<article class="moment">
+  <header class="moment-head">
+    <div class="moment-left">
+      <span class="moment-badge">Chief of Staff</span>
+      <span class="moment-time">{{ (selected_event.time if selected_event else "8:47 AM") }} &middot; today</span>
+    </div>
+    <div class="moment-actions" role="toolbar" aria-label="Moment actions">
+      <button type="button" class="icon-btn" aria-label="Mark resolved">&#10003;</button>
+      <button type="button" class="icon-btn" aria-label="Toggle theme">&#9680;</button>
+      <button type="button" class="icon-btn" aria-label="More">&#8943;</button>
+    </div>
+  </header>
+
+  <h2 class="moment-title">Good morning, {{ cfg.user_name }}</h2>
+  <p class="moment-lead">Here's what happened overnight.</p>
+
+  <div class="crew-row">
+    <span class="crew-avatar" aria-hidden="true"></span>
+    <span class="crew-name">Crew</span>
+    <span class="crew-time">{{ (selected_event.time if selected_event else "8:47 AM") }}</span>
+  </div>
+
+  {% include "partials/card_prs.html" %}
+  {% include "partials/card_mentions.html" %}
+  {% include "partials/card_standup.html" %}
+  {% include "partials/action_row.html" %}
+</article>

@@ -1,0 +1,17 @@
+<section class="card">
+  <header class="card-head">
+    <h3>{{ prs|length }} PR{{ "s" if prs|length != 1 else "" }} moved while you slept</h3>
+  </header>
+  {% if prs %}
+    <ul class="pr-list">
+      {% for pr in prs %}
+        <li class="pr-row">
+          <code class="pr-id">{{ pr.repo }}#{{ pr.number }}</code>
+          <span class="pr-status">{{ pr.status }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="card-empty-text">Nothing moved overnight.</p>
+  {% endif %}
+</section>

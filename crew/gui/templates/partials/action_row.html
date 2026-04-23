@@ -1,0 +1,27 @@
+<div class="action-row">
+  <button
+    type="button"
+    class="btn btn-primary"
+    disabled
+    title="Slack integration coming in Phase 8"
+  >Post to #standup</button>
+  <button
+    type="button"
+    class="btn btn-secondary"
+    hx-post="/standup/edit"
+    hx-swap="none"
+  >Edit draft</button>
+  <button
+    type="button"
+    class="btn btn-secondary"
+    hx-post="/standup/skip"
+    hx-target="#card-standup"
+    hx-swap="outerHTML"
+  >Skip today</button>
+  <button
+    type="button"
+    class="btn btn-ghost"
+    hx-post="/standup/run"
+    hx-swap="none"
+  >Regenerate</button>
+</div>
