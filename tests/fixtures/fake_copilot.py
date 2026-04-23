@@ -31,6 +31,10 @@ class FakeSession:
     sent: list[str] = field(default_factory=list)
     listeners: list[Callable[[FakeEvent], None]] = field(default_factory=list)
     kwargs: dict[str, Any] = field(default_factory=dict)
+    # Mirror the real CopilotSession.session_id attribute. Defaults to the
+    # passed-in session_id (resumption case) or a synthetic id (fresh case)
+    # so the runner can read it back in either path.
+    session_id: str = ""
 
     def on(self, fn: Callable[[FakeEvent], None]) -> None:
         self.listeners.append(fn)
@@ -66,7 +70,8 @@ class FakeClient:
         return None
 
     async def create_session(self, **kwargs: Any) -> FakeSession:
-        session = FakeSession(reply=self.reply, kwargs=dict(kwargs))
+        sid = kwargs.get("session_id") or f"fake-sess-{id(self):x}"
+        session = FakeSession(reply=self.reply, kwargs=dict(kwargs), session_id=sid)
         self.sessions.append(session)
         return session
 

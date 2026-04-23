@@ -7,7 +7,15 @@ the Copilot SDK. Read `CLAUDE.md` for the full design doc.
 
 - `crew/cli.py` — `crew "<prompt>"` entry point. Prompts starting with `/`
   are skill invocations (zero-cost dispatch); otherwise the intent router
-  runs unless `--direct` / `--agent NAME` / `--pipeline` forces a mode
+  runs unless `--direct` / `--agent NAME` / `--pipeline` forces a mode.
+  Direct + agent + slash modes auto-resume their per-(cwd, mode, [agent|skill])
+  Copilot session via `crew/conversations.py`; `--new` / `--session NAME` /
+  `--no-memory` override
+- `crew/conversations.py` — bounded session continuity for chatty modes:
+  per-scope `session_id` cache in `~/.crew/sessions.json`, append-only
+  audit log at `~/.crew/conversations/<scope>.jsonl`, summary-rotation
+  when turn count hits `CREW_TURN_CAP` (default 20). Pipelines + the
+  evaluator never call this module — they stay one-shot per principle #2
 - `crew/direct.py` — direct mode: single LLM call, no pipeline, no
   governance. Accepts an optional `agent_prompt` to swap the system message
   for a standalone-agent persona
@@ -63,7 +71,19 @@ instructions are appended to the session's system message so the call
 proceeds with the capability in-context. Slash dispatch bypasses the
 intent router (zero LLM cost) and uses direct mode underneath. Override
 flags (`--direct`, `--agent`, `--pipeline`) take precedence over slash
-parsing.
+parsing. `/help` is a built-in that prints the local registry without
+calling the SDK.
+
+**Memory.** Direct, agent, and slash modes auto-resume the
+per-(cwd, mode, [agent|skill]) Copilot session up to `CREW_TURN_CAP`
+turns (default 20), then rotate to a fresh session seeded with a
+one-paragraph summary of the prior conversation. The `session_id` is a
+cache; the source of truth is the JSONL audit log at
+`~/.crew/conversations/<scope>.jsonl`. Override with `--new` (force
+fresh), `--session NAME` (named global thread that ignores cwd), or
+`--no-memory` (one-shot, no log, no resume). Inspect via
+`crew sessions {list,show,clear}`. Pipelines and the evaluator are
+**always** one-shot — no `session_id` passthrough, ever.
 
 **Plugins** (Phase 2+, not implemented yet) will bundle multiple skills —
 and optionally agents, pipelines, and hooks — into a single installable
@@ -76,19 +96,22 @@ See CLAUDE.md "Agent Complexity Model" and "Phase 5 — Plugin Marketplace".
 
 ## Build status
 
-**Day 3 shipped.** Level 1 pipelines now run with an isolated evaluator
-session + correction loop: `crew/evaluator.py` runs a fresh
-`CopilotClient` (no MCP, no tools) that grades the generator's output
-against the pipeline's schema and returns a strict JSON verdict.
-`pipeline_runner.run_level_1` retries the generator with the verdict's
-fix instructions appended, up to 3 attempts; `on-eval-fail` fires per
-failed attempt and `on-escalate` fires once on exhaustion or a hard
-`status: escalate` verdict. `pipeline_runner.run_pipeline` is the new
-dispatcher (replaces direct `run_level_0` calls in the CLI).
-`pipelines/incident-triage/` ships as the first Level 1 pipeline.
+**Day 4-A shipped.** Bounded session continuity for chatty modes:
+`crew/conversations.py` persists the per-scope Copilot `session_id` in
+`~/.crew/sessions.json` and appends every turn to a JSONL audit log;
+once `CREW_TURN_CAP` is hit, the next call summarises the JSONL tail
+(via a smaller / cheaper model when `CREW_SUMMARY_MODEL` is set), starts
+a fresh SDK session seeded with the summary, and writes a `rotated`
+event to the JSONL. Three new flags (`--new`, `--session NAME`,
+`--no-memory`) plus `crew sessions {list,show,clear}` for inspection.
+`/help` also gained a Memory section. Pipelines + the evaluator stay
+one-shot — guarded by runtime tests asserting no `session_id` is ever
+passed to `create_session` from the runner.
 
 Earlier days, in order: Day 2 (pipeline runner + hooks +
 `daily-standup`), Day 2.5 (3-way router + `agents/` directory), Day 2.8
-(slash commands invoke skills; `skills/debug/`). Day 4+ adds the
-remaining pipelines (ticket-refinement, code-review-routing,
-release-notes), the streamer, and subagent spawning.
+(slash commands invoke skills; `skills/debug/`), Day 3 (Level 1 pipelines
+with isolated evaluator + correction loop; `incident-triage`), `/help`
+(zero-LLM registry listing). Day 4-B+ will add the streamer + remaining
+pipelines (ticket-refinement, code-review-routing, release-notes) and
+subagent spawning.

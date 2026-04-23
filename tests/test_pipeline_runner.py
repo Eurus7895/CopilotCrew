@@ -322,3 +322,40 @@ def test_run_pipeline_rejects_level_2(tmp_path: Path) -> None:
     level2 = replace(config, level=2)
     with pytest.raises(ValueError, match="Level 2 not supported"):
         _run(pipeline_runner.run_pipeline(level2, "x", crew_home=tmp_path))
+
+
+# ── Memory isolation guards (Day 4-A) ────────────────────────────────────────
+
+
+def test_level_0_pipeline_never_passes_session_id(monkeypatch, tmp_path: Path) -> None:
+    """Pipelines stay one-shot per CLAUDE.md principle #2 — no resumption."""
+    factory = make_fake_copilot_client(reply="ok")
+    monkeypatch.setattr(pipeline_runner, "CopilotClient", factory)
+
+    config = pipeline_registry.load_pipeline(
+        "demo", pipelines_dir=FIXTURES_PIPELINES, repo_root=tmp_path
+    )
+    _run(pipeline_runner.run_level_0(config, "go", crew_home=tmp_path))
+
+    for client in factory.clients:
+        for session in client.sessions:
+            assert "session_id" not in session.kwargs, (
+                "pipeline runner must never resume a Copilot session "
+                "(violates CLAUDE.md principle #2)"
+            )
+
+
+def test_level_1_pipeline_never_passes_session_id(monkeypatch, tmp_path: Path) -> None:
+    factory = make_fake_copilot_client(
+        replies=["## Summary\nok\n", _PASS_VERDICT]
+    )
+    _patch_both_clients(monkeypatch, factory)
+
+    config = _load_demo_l1(tmp_path)
+    _run(pipeline_runner.run_level_1(config, "go", crew_home=tmp_path))
+
+    for client in factory.clients:
+        for session in client.sessions:
+            assert "session_id" not in session.kwargs, (
+                "Level 1 generator + evaluator must never resume sessions"
+            )

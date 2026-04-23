@@ -498,7 +498,17 @@ agent loader.
     logs.db                      SQLite audit log (WAL mode)
     progress.md                  session notes — append per run, read at start
     config.yaml                  auth, model, output preferences
+    sessions.json                per-scope Copilot session_id cache (Day 4-A)
+    conversations/<scope>.jsonl  per-scope turn log (audit trail; Day 4-A)
 ```
+
+Env vars affecting state:
+* `CREW_HOME` — root directory (default `~/.crew`)
+* `CREW_TURN_CAP` — turns per chatty session before summary rotation
+  (default 20)
+* `CREW_SUMMARY_MODEL` — model for the rotation summary call (default:
+  same as the user's model; set to a smaller / cheaper model to keep
+  context-management work off the primary model)
 
 ---
 
@@ -593,7 +603,41 @@ Implementation notes:
   contract doesn't fit the generator/evaluator loop. The Day 3 loop
   lives inside `pipeline_runner.run_level_1` instead.
 
-### Day 4 — Streaming + remaining pipelines
+### Day 4-A — Bounded session continuity for chatty modes
+```
+[x] crew/conversations.py: per-scope session_id cache + JSONL audit log
+[x] crew/direct.py: accept session_id, return DirectResult (id + text)
+[x] crew/cli.py: --new / --session NAME / --no-memory + memory wrapper
+[x] Summary rotation when CREW_TURN_CAP turns reached (cheap model)
+[x] crew sessions {list,show,clear} subcommand
+[x] Pipelines + evaluator stay one-shot (runtime guard tests)
+```
+
+Implementation notes:
+
+* **Source of truth is the JSONL.** `~/.crew/conversations/<scope>.jsonl`
+  is append-only — every turn becomes one row, plus `rotated` event rows
+  at compaction boundaries. The Copilot `session_id` in
+  `~/.crew/sessions.json` is just a cache: if the SDK loses the session
+  we can still reconstruct context from the log.
+* **Scope = (mode, agent_or_skill, cwd)** for the auto-default; the cwd
+  is hashed (filesystem-safe key) and the readable cwd is stored inside
+  the value so `crew sessions list` can render it. Named sessions
+  (`--session NAME`) are global by design — pick the thread up from any
+  directory.
+* **Slash commands carry per-skill memory.** `scope = ("slash",
+  skill_name, cwd)` so `/debug` in projA and `/debug` in projB are
+  separate threads, and neither pollutes bare direct mode.
+* **Rotation uses a smaller model when configured.** `CREW_SUMMARY_MODEL`
+  overrides the user's main model for the one-shot summarisation call.
+  The summary is injected as `## Previous conversation summary` in the
+  next session's system message and as a `summary` field on the
+  `rotated` JSONL event.
+* **Pipelines + evaluator NEVER resume.** Principle #2 is non-negotiable.
+  Two runtime guard tests assert `session_id` never appears in
+  `create_session` kwargs from `pipeline_runner` or the evaluator.
+
+### Day 4-B — Streaming + remaining pipelines
 ```
 [ ] streamer.py: terminal output + summary mode
 [ ] ticket-refinement, code-review-routing, release-notes
@@ -715,6 +759,6 @@ architecture primitives, different execution model.
 
 *Updated: April 2026*
 *Product: Crew*
-*Phase: Day 3 shipped; Day 4 next*
+*Phase: Day 4-A shipped; Day 4-B next*
 *First user: Current team*
-*Next: Day 4 — streamer + remaining pipelines (ticket-refinement, code-review-routing, release-notes)*
+*Next: Day 4-B — streamer + remaining pipelines (ticket-refinement, code-review-routing, release-notes)*
