@@ -542,14 +542,25 @@ Enforced via `pre-tool-use` hook — deterministic, not prompt-based.
 
 ### Day 2 — Intent router + standup (Level 0)
 ```
-[ ] intent_router.py: classify direct vs pipeline:{name}
-[ ] PIPELINE_REGISTRY with descriptions for router matching
-[ ] Load pipeline from pipelines/standup/ directory
-[ ] pipeline_runner.py Level 0 execution
-[ ] Hook injection points: session-start, pre-tool-use, post-tool-use
-[ ] Test: crew "standup prep" → routes to pipeline → output file
-[ ] Test: crew "what time is it?" → routes to direct → inline answer
-[ ] --direct and --pipeline override flags work
+[x] intent_router.py: classify direct vs pipeline:{name}
+[x] PIPELINE_REGISTRY with descriptions for router matching
+[x] Load pipeline from pipelines/standup/ directory
+[x] pipeline_runner.py Level 0 execution
+[x] Hook injection points: session-start, pre-tool-use, post-tool-use
+[x] Test: crew "standup prep" → routes to pipeline → output file
+[x] Test: crew "what time is it?" → routes to direct → inline answer
+[x] --direct and --pipeline override flags work
+```
+
+### Day 2.5 / 2.75 / 2.8 — Agents, slash commands, skills
+Incremental slices landed alongside Day 2 to close the ergonomics gap
+before Day 3's evaluator work:
+```
+[x] agents/<name>.md — standalone persona swaps (--agent NAME + auto-summon)
+[x] Intent router upgraded to 3-way (direct / agent / pipeline)
+[x] Slash commands invoke skills at skills/<name>/SKILL.md
+[x] skill_registry supports multiple search roots (plugin-ready)
+[x] skills/debug/ — first shipped skill
 ```
 
 ### Day 3 — Evaluator + incident-triage (Level 1)
@@ -682,6 +693,6 @@ architecture primitives, different execution model.
 
 *Updated: April 2026*
 *Product: Crew*
-*Phase: Pre-build*
+*Phase: Day 2.8 shipped; Day 3 next*
 *First user: Current team*
-*Next: Day 1 — SDK smoke test + harness port*
+*Next: Day 3 — evaluator + incident-triage (Level 1)*
