@@ -542,14 +542,25 @@ Enforced via `pre-tool-use` hook — deterministic, not prompt-based.
 
 ### Day 2 — Intent router + standup (Level 0)
 ```
-[ ] intent_router.py: classify direct vs pipeline:{name}
-[ ] PIPELINE_REGISTRY with descriptions for router matching
-[ ] Load pipeline from pipelines/standup/ directory
-[ ] pipeline_runner.py Level 0 execution
-[ ] Hook injection points: session-start, pre-tool-use, post-tool-use
-[ ] Test: crew "standup prep" → routes to pipeline → output file
-[ ] Test: crew "what time is it?" → routes to direct → inline answer
-[ ] --direct and --pipeline override flags work
+[x] intent_router.py: classify direct vs pipeline:{name}
+[x] PIPELINE_REGISTRY with descriptions for router matching
+[x] Load pipeline from pipelines/standup/ directory
+[x] pipeline_runner.py Level 0 execution
+[x] Hook injection points: session-start, pre-tool-use, post-tool-use
+[x] Test: crew "standup prep" → routes to pipeline → output file
+[x] Test: crew "what time is it?" → routes to direct → inline answer
+[x] --direct and --pipeline override flags work
+```
+
+### Day 2.5 / 2.75 / 2.8 — Agents, slash commands, skills
+Incremental slices landed alongside Day 2 to close the ergonomics gap
+before Day 3's evaluator work:
+```
+[x] agents/<name>.md — standalone persona swaps (--agent NAME + auto-summon)
+[x] Intent router upgraded to 3-way (direct / agent / pipeline)
+[x] Slash commands invoke skills at skills/<name>/SKILL.md
+[x] skill_registry supports multiple search roots (plugin-ready)
+[x] skills/debug/ — first shipped skill
 ```
 
 ### Day 3 — Evaluator + incident-triage (Level 1)
@@ -581,20 +592,29 @@ Enforced via `pre-tool-use` hook — deterministic, not prompt-based.
 
 Designed now. Not building in v1.
 
-### Phase 2 — Pipeline Install (Month 2+)
-`crew install` = copy a pipeline directory. The v1 format IS the install format.
+### Phase 2 — Plugin + Pipeline Install (Month 2+)
+`crew install` = copy a directory into the project. A plugin bundles
+multiple skills (and optionally agents, pipelines, hooks) under
+`plugins/<name>/` with a `plugin.yaml` manifest and nested `skills/`,
+`agents/`, `pipelines/` directories. The v1 file formats ARE the install
+formats — no migration. The skill registry already supports multiple
+search roots (local `skills/` + any `plugins/*/skills/`), so activating
+plugin discovery is a registry-wiring change, not a format redesign.
 
 ### Phase 3 — Auto-Invoke Skills (Month 3+)
 Skills register trigger descriptions in frontmatter. LLM decides which
 to load — no classifier, no regex. Same mechanism as Claude Code skills.
+Day 2.8 shipped explicit skill invocation via `/skill-name`; Phase 3 adds
+the auto-invoke path without changing the skill file format.
 
 ### Phase 4 — Custom Hooks (Month 3+)
 Hooks become executable: `type: command` (shell), `type: http` (webhook),
 `type: agent` (spawn agent to handle event). Follows Claude Code hook types.
 
 ### Phase 5 — Plugin Marketplace (Month 6+)
-GitHub repo of validated pipelines. `crew install name@crew-plugins-official`.
-Pipeline-as-directory format = marketplace entry format. No migration.
+GitHub repo of validated plugins. `crew install name@crew-plugins-official`
+fetches and installs. Plugin-as-directory format = marketplace entry
+format (see Phase 2). No migration.
 
 ### Phase 6 — SSO / Enterprise Auth (Month 4+)
 Only after team adoption proven.
@@ -673,6 +693,6 @@ architecture primitives, different execution model.
 
 *Updated: April 2026*
 *Product: Crew*
-*Phase: Pre-build*
+*Phase: Day 2.8 shipped; Day 3 next*
 *First user: Current team*
-*Next: Day 1 — SDK smoke test + harness port*
+*Next: Day 3 — evaluator + incident-triage (Level 1)*
