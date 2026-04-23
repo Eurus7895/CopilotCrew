@@ -605,34 +605,31 @@ Implementation notes:
 
 ### Day 4-A — Bounded session continuity for chatty modes
 ```
-[x] crew/conversations.py: per-scope session_id cache + JSONL audit log
+[x] crew/conversations.py: per-scope session_id cache + rotation log
 [x] crew/direct.py: accept session_id, return DirectResult (id + text)
-[x] crew/cli.py: --new / --session NAME / --no-memory + memory wrapper
-[x] Summary rotation when CREW_TURN_CAP turns reached (cheap model)
-[x] crew sessions {list,show,clear} subcommand
+[x] crew/cli.py: --new flag + memory wrapper (zero additional CLI surface)
+[x] Summary rotation when CREW_TURN_CAP turns reached (CREW_SUMMARY_MODEL
+    selects the summariser model; default: user's current model)
 [x] Pipelines + evaluator stay one-shot (runtime guard tests)
 ```
 
 Implementation notes:
 
-* **Source of truth is the JSONL.** `~/.crew/conversations/<scope>.jsonl`
-  is append-only — every turn becomes one row, plus `rotated` event rows
-  at compaction boundaries. The Copilot `session_id` in
-  `~/.crew/sessions.json` is just a cache: if the SDK loses the session
-  we can still reconstruct context from the log.
-* **Scope = (mode, agent_or_skill, cwd)** for the auto-default; the cwd
-  is hashed (filesystem-safe key) and the readable cwd is stored inside
-  the value so `crew sessions list` can render it. Named sessions
-  (`--session NAME`) are global by design — pick the thread up from any
-  directory.
+* **Minimal surface by design.** Users don't manage sessions — they just
+  chat. The only user-facing knob is `--new` (forget and start over).
+  An earlier draft added `--session NAME`, `--no-memory`, and a
+  `crew sessions {list,show,clear}` subcommand; all three were dropped
+  as surplus surface once the real requirement became clear.
+* **Scope = (mode, agent_or_skill, cwd)** hashed for filesystem safety.
+  The readable cwd is stored inside the session value for audit but is
+  not user-facing.
 * **Slash commands carry per-skill memory.** `scope = ("slash",
   skill_name, cwd)` so `/debug` in projA and `/debug` in projB are
   separate threads, and neither pollutes bare direct mode.
-* **Rotation uses a smaller model when configured.** `CREW_SUMMARY_MODEL`
-  overrides the user's main model for the one-shot summarisation call.
-  The summary is injected as `## Previous conversation summary` in the
-  next session's system message and as a `summary` field on the
-  `rotated` JSONL event.
+* **JSONL is rotation input, not a user surface.** Each turn appends
+  one row to `~/.crew/conversations/<scope>.jsonl`; rotation reads the
+  tail to produce the handoff summary, then writes a `rotated` event
+  marker. The log is internal plumbing — no CLI exposes it.
 * **Pipelines + evaluator NEVER resume.** Principle #2 is non-negotiable.
   Two runtime guard tests assert `session_id` never appears in
   `create_session` kwargs from `pipeline_runner` or the evaluator.

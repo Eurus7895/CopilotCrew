@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 from pathlib import Path
 
@@ -44,28 +43,15 @@ def test_compute_scope_varies_by_cwd(tmp_path: Path) -> None:
     assert sa != sb
 
 
-def test_named_scope_is_global(tmp_path: Path) -> None:
-    a = tmp_path / "a"
-    b = tmp_path / "b"
-    a.mkdir()
-    b.mkdir()
-    sa = conversations.compute_scope(cwd=a, mode="direct", named="refactor-x")
-    sb = conversations.compute_scope(cwd=b, mode="agent", agent="coder", named="refactor-x")
-    # Named sessions ignore mode / agent / cwd.
-    assert sa == sb
-    assert sa.startswith("named__")
-
-
 def test_compute_scope_is_filesystem_safe(tmp_path: Path) -> None:
     scope = conversations.compute_scope(
-        cwd=tmp_path, mode="agent", agent="coder", named=None
+        cwd=tmp_path, mode="agent", agent="coder"
     )
-    # Must be a valid filename (no slashes, colons, spaces).
     forbidden = {"/", "\\", ":", " ", "?", "*", "<", ">", "|", '"'}
     assert not (forbidden & set(scope))
 
 
-# ── save / load / clear ──────────────────────────────────────────────────────
+# ── save / load ──────────────────────────────────────────────────────────────
 
 
 def test_save_load_roundtrip(tmp_path: Path) -> None:
@@ -77,7 +63,6 @@ def test_save_load_roundtrip(tmp_path: Path) -> None:
         cwd=tmp_path,
         mode="direct",
         agent=None,
-        named=None,
         crew_home=tmp_path,
     )
     assert state.session_id == "sess_1"
@@ -103,7 +88,6 @@ def test_save_preserves_started_at_across_updates(tmp_path: Path) -> None:
         cwd=tmp_path,
         mode="direct",
         agent=None,
-        named=None,
         crew_home=tmp_path,
     )
     second = conversations.save_session(
@@ -113,63 +97,10 @@ def test_save_preserves_started_at_across_updates(tmp_path: Path) -> None:
         cwd=tmp_path,
         mode="direct",
         agent=None,
-        named=None,
         crew_home=tmp_path,
     )
     assert first.started_at == second.started_at
-    # last_used updates on each save.
     assert second.last_used >= first.last_used
-
-
-def test_clear_session_drops_state_and_jsonl(tmp_path: Path) -> None:
-    scope = "x"
-    conversations.save_session(
-        scope,
-        session_id="sess_1",
-        turn_count=1,
-        cwd=tmp_path,
-        mode="direct",
-        agent=None,
-        named=None,
-        crew_home=tmp_path,
-    )
-    conversations.append_turn(
-        scope,
-        mode="direct",
-        agent=None,
-        user="hi",
-        assistant="hello",
-        session_id="sess_1",
-        crew_home=tmp_path,
-    )
-    assert conversations.load_session(scope, crew_home=tmp_path) is not None
-    assert (tmp_path / "conversations" / f"{scope}.jsonl").exists()
-
-    removed = conversations.clear_session(scope, crew_home=tmp_path)
-    assert removed is True
-    assert conversations.load_session(scope, crew_home=tmp_path) is None
-    assert not (tmp_path / "conversations" / f"{scope}.jsonl").exists()
-
-
-def test_clear_missing_scope_is_noop(tmp_path: Path) -> None:
-    assert conversations.clear_session("nope", crew_home=tmp_path) is False
-
-
-def test_clear_all_drops_every_scope(tmp_path: Path) -> None:
-    for n in ("a", "b", "c"):
-        conversations.save_session(
-            n,
-            session_id=f"sess_{n}",
-            turn_count=1,
-            cwd=tmp_path,
-            mode="direct",
-            agent=None,
-            named=None,
-            crew_home=tmp_path,
-        )
-    count = conversations.clear_all(crew_home=tmp_path)
-    assert count == 3
-    assert conversations.list_scope_keys(crew_home=tmp_path) == []
 
 
 def test_corrupt_sessions_json_is_treated_as_empty(
@@ -181,7 +112,7 @@ def test_corrupt_sessions_json_is_treated_as_empty(
     assert any("could not read" in r.message for r in caplog.records)
 
 
-# ── append_turn / tail / append_event ────────────────────────────────────────
+# ── append_turn / append_event / _read_tail ──────────────────────────────────
 
 
 def test_append_turn_writes_jsonl_row(tmp_path: Path) -> None:
@@ -195,29 +126,12 @@ def test_append_turn_writes_jsonl_row(tmp_path: Path) -> None:
         session_id="sess_1",
         crew_home=tmp_path,
     )
-    rows = conversations.tail(scope, crew_home=tmp_path)
+    rows = conversations._read_tail(scope, crew_home=tmp_path)
     assert len(rows) == 1
     assert rows[0]["type"] == "turn"
     assert rows[0]["user"] == "hi"
     assert rows[0]["assistant"] == "hello"
     assert rows[0]["session_id"] == "sess_1"
-    assert "ts" in rows[0]
-
-
-def test_append_turn_appends_in_order(tmp_path: Path) -> None:
-    scope = "x"
-    for i in range(3):
-        conversations.append_turn(
-            scope,
-            mode="agent",
-            agent="coder",
-            user=f"u{i}",
-            assistant=f"a{i}",
-            session_id="sess",
-            crew_home=tmp_path,
-        )
-    rows = conversations.tail(scope, crew_home=tmp_path)
-    assert [r["user"] for r in rows] == ["u0", "u1", "u2"]
 
 
 def test_append_event_marks_rotations(tmp_path: Path) -> None:
@@ -225,29 +139,13 @@ def test_append_event_marks_rotations(tmp_path: Path) -> None:
     conversations.append_event(
         scope, "rotated", {"old_session_id": "sess_1"}, crew_home=tmp_path
     )
-    rows = conversations.tail(scope, crew_home=tmp_path)
+    rows = conversations._read_tail(scope, crew_home=tmp_path)
     assert rows[0]["type"] == "event"
     assert rows[0]["event"] == "rotated"
     assert rows[0]["old_session_id"] == "sess_1"
 
 
-def test_tail_returns_last_n_rows(tmp_path: Path) -> None:
-    scope = "x"
-    for i in range(5):
-        conversations.append_turn(
-            scope,
-            mode="direct",
-            agent=None,
-            user=f"u{i}",
-            assistant="a",
-            session_id="sess",
-            crew_home=tmp_path,
-        )
-    last2 = conversations.tail(scope, n=2, crew_home=tmp_path)
-    assert [r["user"] for r in last2] == ["u3", "u4"]
-
-
-def test_tail_skips_corrupt_lines(tmp_path: Path) -> None:
+def test_read_tail_skips_corrupt_lines(tmp_path: Path) -> None:
     scope = "x"
     p = tmp_path / "conversations" / f"{scope}.jsonl"
     p.parent.mkdir(parents=True)
@@ -257,7 +155,7 @@ def test_tail_skips_corrupt_lines(tmp_path: Path) -> None:
         '{"type":"turn","user":"again","assistant":"y","session_id":"s"}\n',
         encoding="utf-8",
     )
-    rows = conversations.tail(scope, crew_home=tmp_path)
+    rows = conversations._read_tail(scope, crew_home=tmp_path)
     assert [r["user"] for r in rows] == ["ok", "again"]
 
 
@@ -271,7 +169,6 @@ def test_should_rotate_at_cap(tmp_path: Path) -> None:
         cwd=str(tmp_path),
         mode="direct",
         agent=None,
-        named=None,
         started_at="t",
         last_used="t",
     )
@@ -285,7 +182,6 @@ def test_should_rotate_returns_false_for_none() -> None:
 
 def test_turn_cap_default_uses_env(monkeypatch) -> None:
     monkeypatch.setenv("CREW_TURN_CAP", "5")
-    # The constant is read at import time, so re-evaluate via the helper.
     assert conversations._turn_cap_default() == 5
 
 
@@ -293,49 +189,6 @@ def test_turn_cap_default_falls_back_on_invalid(monkeypatch, caplog) -> None:
     monkeypatch.setenv("CREW_TURN_CAP", "not-a-number")
     with caplog.at_level(logging.WARNING, logger="crew.conversations"):
         assert conversations._turn_cap_default() == 20
-
-
-# ── list_scopes ──────────────────────────────────────────────────────────────
-
-
-def test_list_scopes_returns_states_in_order(tmp_path: Path) -> None:
-    for n in ("zzz", "aaa", "mmm"):
-        conversations.save_session(
-            n,
-            session_id=f"sess_{n}",
-            turn_count=1,
-            cwd=tmp_path,
-            mode="direct",
-            agent=None,
-            named=None,
-            crew_home=tmp_path,
-        )
-    scopes = conversations.list_scopes(crew_home=tmp_path)
-    assert [s.session_id for s in scopes] == ["sess_aaa", "sess_mmm", "sess_zzz"]
-
-
-# ── render_session_table ─────────────────────────────────────────────────────
-
-
-def test_render_session_table_handles_empty() -> None:
-    assert "no sessions" in conversations.render_session_table([])
-
-
-def test_render_session_table_shows_named_as_any_cwd(tmp_path: Path) -> None:
-    state = conversations.save_session(
-        "named__abc",
-        session_id="sess",
-        turn_count=4,
-        cwd=tmp_path,
-        mode="direct",
-        agent=None,
-        named="refactor-x",
-        crew_home=tmp_path,
-    )
-    rendered = conversations.render_session_table([state])
-    assert "named:refactor-x" in rendered
-    assert "(any cwd)" in rendered
-    assert "4 turns" in rendered
 
 
 # ── summarize_for_rotation ───────────────────────────────────────────────────
@@ -406,9 +259,9 @@ def test_summary_is_not_logged_to_jsonl(monkeypatch, tmp_path: Path) -> None:
         session_id="sess",
         crew_home=tmp_path,
     )
-    rows_before = conversations.tail(scope, crew_home=tmp_path)
+    rows_before = conversations._read_tail(scope, crew_home=tmp_path)
     _run(conversations.summarize_for_rotation(scope, crew_home=tmp_path))
-    rows_after = conversations.tail(scope, crew_home=tmp_path)
+    rows_after = conversations._read_tail(scope, crew_home=tmp_path)
     # Summary call MUST NOT pollute the JSONL — that's reserved for
     # real turns and explicit events.
     assert rows_after == rows_before

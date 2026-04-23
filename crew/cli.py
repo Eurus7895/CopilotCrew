@@ -9,22 +9,18 @@ the call proceeds with the capability in-context. Slash dispatch bypasses
 the intent router (zero LLM cost).
 
 **Memory.** Direct + agent + slash modes auto-resume the per-(cwd, mode,
-[agent|skill]) Copilot session up to ``CREW_TURN_CAP`` turns (default 20),
-then rotate to a fresh session seeded with a one-paragraph summary
-(``crew/conversations.py``). Pipelines and the evaluator are always
-one-shot — no ``session_id`` passthrough, ever (per CLAUDE.md principle
-#2). Override flags: ``--new`` forces fresh, ``--session NAME`` uses a
-global named thread, ``--no-memory`` skips logging entirely.
+[agent|skill]) Copilot session and rotate silently every
+``CREW_TURN_CAP`` turns (default 20). ``--new`` forces a fresh start.
+Pipelines and the evaluator are always one-shot — never resume, never
+log (CLAUDE.md principle #2).
 """
 
 from __future__ import annotations
 
 import argparse
 import asyncio
-import json
 import sys
 from pathlib import Path
-from typing import Any
 
 from crew import (
     agent_registry,
@@ -66,18 +62,6 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Force a fresh Copilot session for this scope (drops cached session_id).",
     )
-    parser.add_argument(
-        "--session",
-        metavar="NAME",
-        default=None,
-        help="Use a named global thread instead of the per-cwd auto-scope.",
-    )
-    parser.add_argument(
-        "--no-memory",
-        action="store_true",
-        dest="no_memory",
-        help="One-shot call: do not log to ~/.crew/conversations or resume any session.",
-    )
     return parser
 
 
@@ -94,31 +78,19 @@ async def _run_direct_with_memory(
     agent_prompt: str | None,
     skill_prompt: str | None,
     new: bool,
-    named: str | None,
-    no_memory: bool,
-) -> DirectResult | None:
-    """Wrap ``run_direct`` with the conversations bookkeeping.
+) -> DirectResult:
+    """Wrap ``run_direct`` with per-scope session continuity.
 
-    ``no_memory=True`` skips the wrapper entirely — equivalent to the
-    pre-Day-4-A behaviour. Pipelines and the evaluator never call this
-    function; they go straight to ``CopilotClient`` with no ``session_id``.
+    Auto-resumes the cached session for this ``(cwd, mode, [agent|skill])``
+    scope, rotating silently at ``CREW_TURN_CAP`` turns. Pipelines and the
+    evaluator never call this function — they go straight to
+    ``CopilotClient`` with no ``session_id`` (CLAUDE.md principle #2).
     """
-    if no_memory:
-        await run_direct(
-            prompt,
-            model=model,
-            agent_prompt=agent_prompt,
-            skill_prompt=skill_prompt,
-        )
-        return None
-
     scope_agent = agent_name if mode == "agent" else (
         skill_name if mode == "slash" else None
     )
-    cwd = None if named else Path.cwd()
-    scope = conversations.compute_scope(
-        cwd=cwd, mode=mode, agent=scope_agent, named=named
-    )
+    cwd = Path.cwd()
+    scope = conversations.compute_scope(cwd=cwd, mode=mode, agent=scope_agent)
 
     state = None if new else conversations.load_session(scope)
 
@@ -141,9 +113,9 @@ async def _run_direct_with_memory(
                     "summary": history_prompt,
                 },
             )
-            session_id = None  # fresh SDK session
+            session_id = None
             next_turn_count = 1
-            started_at = state.started_at  # logically the same thread
+            started_at = state.started_at
         else:
             session_id = state.session_id
             next_turn_count = state.turn_count + 1
@@ -173,7 +145,6 @@ async def _run_direct_with_memory(
         cwd=cwd,
         mode=mode,
         agent=scope_agent,
-        named=named,
         started_at=started_at,
     )
     return result
@@ -182,14 +153,7 @@ async def _run_direct_with_memory(
 # ── Slash dispatch ───────────────────────────────────────────────────────────
 
 
-async def _dispatch_slash(
-    prompt: str,
-    *,
-    model: str | None,
-    new: bool,
-    named: str | None,
-    no_memory: bool,
-) -> None:
+async def _dispatch_slash(prompt: str, *, model: str | None, new: bool) -> None:
     """Parse ``/<skill-name> [rest]`` and dispatch without calling the router.
 
     A slash command invokes a skill: the skill's instructions are appended
@@ -199,9 +163,7 @@ async def _dispatch_slash(
     commands.
 
     ``/help`` is a built-in: it prints the local registry (pipelines,
-    standalone agents, skills) without calling the SDK. The built-in
-    shadows any user-defined ``skills/help/`` so help output is always
-    deterministic.
+    standalone agents, skills) without calling the SDK.
     """
     name, _, rest = prompt[1:].partition(" ")
     name = name.strip()
@@ -230,8 +192,6 @@ async def _dispatch_slash(
         agent_prompt=None,
         skill_prompt=skill.instructions,
         new=new,
-        named=named,
-        no_memory=no_memory,
     )
 
 
@@ -254,9 +214,7 @@ def _slash_usage_error(msg: str) -> None:
 def _print_help() -> None:
     """Print discovered pipelines, standalone agents, and skills.
 
-    Zero LLM cost — straight registry walk, written to stdout. Empty
-    sections are shown explicitly so the user can tell the registry was
-    actually consulted (vs. a silent failure).
+    Zero LLM cost — straight registry walk, written to stdout.
     """
     pipelines = pipeline_registry.discover()
     agents = [a for a in agent_registry.discover() if a.standalone]
@@ -298,13 +256,8 @@ def _print_help() -> None:
     out.write("  crew \"<prompt>\"          → router picks direct / agent / pipeline\n")
     out.write("  crew --direct \"<prompt>\" → force direct mode (single LLM call)\n")
     out.write("  crew --pipeline \"<x>\"    → force pipeline mode\n")
+    out.write("  crew --new \"<x>\"         → fresh session (drop cached memory)\n")
     out.write("  /help                    → this listing (zero LLM cost)\n")
-    out.write("\n")
-    out.write("Memory:\n")
-    out.write("  --new                    → fresh session for this scope\n")
-    out.write("  --session NAME           → named thread (cwd-independent)\n")
-    out.write("  --no-memory              → one-shot, no log, no resume\n")
-    out.write("  crew sessions list       → inspect saved sessions\n")
     out.flush()
 
 
@@ -319,8 +272,6 @@ async def _dispatch(
     pipeline: bool,
     model: str | None,
     new: bool,
-    named: str | None,
-    no_memory: bool,
 ) -> None:
     if direct:
         await _run_direct_with_memory(
@@ -332,8 +283,6 @@ async def _dispatch(
             agent_prompt=None,
             skill_prompt=None,
             new=new,
-            named=named,
-            no_memory=no_memory,
         )
         return
 
@@ -348,8 +297,6 @@ async def _dispatch(
             agent_prompt=agent_cfg.prompt,
             skill_prompt=None,
             new=new,
-            named=named,
-            no_memory=no_memory,
         )
         return
 
@@ -357,9 +304,7 @@ async def _dispatch(
     # passed. Explicit overrides above take precedence so the user can
     # send a literal prompt starting with "/" via `--direct "/foo"`.
     if not pipeline and prompt.startswith("/"):
-        await _dispatch_slash(
-            prompt, model=model, new=new, named=named, no_memory=no_memory
-        )
+        await _dispatch_slash(prompt, model=model, new=new)
         return
 
     pipelines = pipeline_registry.discover()
@@ -382,8 +327,6 @@ async def _dispatch(
             agent_prompt=None,
             skill_prompt=None,
             new=new,
-            named=named,
-            no_memory=no_memory,
         )
         return
 
@@ -399,8 +342,6 @@ async def _dispatch(
             agent_prompt=agent_cfg.prompt,
             skill_prompt=None,
             new=new,
-            named=named,
-            no_memory=no_memory,
         )
         return
 
@@ -421,72 +362,8 @@ async def _dispatch(
     )
 
 
-# ── `crew sessions` subcommand ───────────────────────────────────────────────
-
-
-def _resolve_scope_or_die(user_input: str) -> str:
-    keys = conversations.list_scope_keys()
-    if user_input in keys:
-        return user_input
-    # Try interpreting as a named session.
-    named = conversations.compute_scope(
-        cwd=None, mode="direct", agent=None, named=user_input
-    )
-    if named in keys:
-        return named
-    # Substring match (single hit only).
-    matches = [k for k in keys if user_input in k]
-    if len(matches) == 1:
-        return matches[0]
-    if matches:
-        sys.stderr.write(
-            f"crew: ambiguous scope {user_input!r}; matches: {', '.join(matches)}\n"
-        )
-    else:
-        sys.stderr.write(f"crew: no scope matches {user_input!r}\n")
-    raise SystemExit(2)
-
-
-def _sessions_main(args: list[str]) -> int:
-    if not args or args[0] in ("list", "ls"):
-        states = conversations.list_scopes()
-        sys.stdout.write(conversations.render_session_table(states))
-        return 0
-    if args[0] == "show":
-        if len(args) < 2:
-            sys.stderr.write("usage: crew sessions show <scope-or-name>\n")
-            return 2
-        scope = _resolve_scope_or_die(args[1])
-        rows = conversations.tail(scope, n=20)
-        if not rows:
-            sys.stdout.write("(no rows)\n")
-            return 0
-        for row in rows:
-            sys.stdout.write(json.dumps(row) + "\n")
-        return 0
-    if args[0] == "clear":
-        if len(args) >= 2 and args[1] == "--all":
-            count = conversations.clear_all()
-            sys.stdout.write(f"cleared {count} session(s)\n")
-            return 0
-        if len(args) < 2:
-            sys.stderr.write("usage: crew sessions clear <scope-or-name> | --all\n")
-            return 2
-        scope = _resolve_scope_or_die(args[1])
-        ok = conversations.clear_session(scope)
-        sys.stdout.write(("cleared " if ok else "no such scope: ") + scope + "\n")
-        return 0
-    sys.stderr.write(
-        f"crew: unknown sessions command {args[0]!r}; try `list`, `show`, or `clear`\n"
-    )
-    return 2
-
-
 def main(argv: list[str] | None = None) -> int:
-    raw = list(sys.argv[1:] if argv is None else argv)
-    if raw and raw[0] == "sessions":
-        return _sessions_main(raw[1:])
-    args = build_parser().parse_args(raw)
+    args = build_parser().parse_args(argv)
     prompt = " ".join(args.prompt)
     try:
         asyncio.run(
@@ -497,8 +374,6 @@ def main(argv: list[str] | None = None) -> int:
                 pipeline=args.pipeline,
                 model=args.model,
                 new=args.new,
-                named=args.session,
-                no_memory=args.no_memory,
             )
         )
     except KeyboardInterrupt:

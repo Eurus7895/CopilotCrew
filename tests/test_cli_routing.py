@@ -6,7 +6,6 @@ which dispatch path each flag combo takes without touching the SDK.
 
 from __future__ import annotations
 
-import json
 import pathlib
 
 import pytest
@@ -415,6 +414,12 @@ def test_slash_help_works_with_empty_skill_registry(monkeypatch, spies, capsys):
 # ── Memory wrapper (Day 4-A) ─────────────────────────────────────────────────
 
 
+def _scope_keys() -> list[str]:
+    """Peek at sessions.json directly — the public API intentionally
+    doesn't expose scope listing (that was Day 4-A surplus surface)."""
+    return sorted(conversations._load_all().keys())
+
+
 def test_direct_first_call_starts_fresh_session(spies, tmp_path):
     rc = cli.main(["--direct", "hello"])
     assert rc == 0
@@ -423,8 +428,7 @@ def test_direct_first_call_starts_fresh_session(spies, tmp_path):
     assert kwargs.get("session_id") is None
     # JSONL row + sessions.json entry written under tmp CREW_HOME.
     assert (tmp_path / "sessions.json").exists()
-    scopes = conversations.list_scope_keys()
-    assert len(scopes) == 1
+    assert len(_scope_keys()) == 1
 
 
 def test_direct_second_call_resumes_session(spies, tmp_path):
@@ -438,7 +442,7 @@ def test_direct_second_call_resumes_session(spies, tmp_path):
     # Second call MUST pass the cached session_id back to run_direct.
     assert kwargs["session_id"] == "sess_aaa"
 
-    state = conversations.load_session(conversations.list_scope_keys()[0])
+    state = conversations.load_session(_scope_keys()[0])
     assert state.turn_count == 2
 
 
@@ -449,50 +453,28 @@ def test_new_flag_drops_cached_session(spies, tmp_path):
     cli.main(["--direct", "--new", "fresh start"])
     args, kwargs = spies["direct"].called_with[0]
     assert kwargs.get("session_id") is None
-    state = conversations.load_session(conversations.list_scope_keys()[0])
+    state = conversations.load_session(_scope_keys()[0])
     # turn_count resets to 1 because we forced a fresh session.
     assert state.turn_count == 1
-
-
-def test_session_named_overrides_cwd_scope(spies, tmp_path):
-    cli.main(["--direct", "--session", "refactor-x", "hi"])
-    keys = conversations.list_scope_keys()
-    assert len(keys) == 1
-    assert keys[0].startswith("named__")
-    state = conversations.load_session(keys[0])
-    assert state.named == "refactor-x"
-    assert state.cwd is None
-
-
-def test_no_memory_skips_session_persistence(spies, tmp_path):
-    rc = cli.main(["--direct", "--no-memory", "ephemeral"])
-    assert rc == 0
-    # No sessions.json entry, no JSONL.
-    assert conversations.list_scope_keys() == []
-    args, kwargs = spies["direct"].called_with[0]
-    assert kwargs.get("session_id") is None
 
 
 def test_agent_mode_uses_separate_scope_from_direct(spies, tmp_path):
     cli.main(["--direct", "hi"])
     cli.main(["--agent", "coder", "fix bug"])
-    keys = conversations.list_scope_keys()
     # Two distinct scopes: direct + agent:coder.
-    assert len(keys) == 2
+    assert len(_scope_keys()) == 2
 
 
 def test_agent_mode_carries_persona_in_scope(spies, tmp_path):
     cli.main(["--agent", "coder", "fix bug"])
-    keys = conversations.list_scope_keys()
-    state = conversations.load_session(keys[0])
+    state = conversations.load_session(_scope_keys()[0])
     assert state.mode == "agent"
     assert state.agent == "coder"
 
 
 def test_slash_uses_skill_scoped_memory(spies, tmp_path):
     cli.main(["/debug", "why is my test failing"])
-    keys = conversations.list_scope_keys()
-    state = conversations.load_session(keys[0])
+    state = conversations.load_session(_scope_keys()[0])
     assert state.mode == "slash"
     assert state.agent == "debug"  # skill_name lives in the agent slot
 
@@ -503,7 +485,7 @@ def test_pipeline_does_not_touch_sessions_json(spies, tmp_path):
     )
     cli.main(["standup prep"])
     # Pipelines stay one-shot — no memory bookkeeping.
-    assert conversations.list_scope_keys() == []
+    assert _scope_keys() == []
     assert spies["runner"].called_with  # but the pipeline DID run
 
 
@@ -531,90 +513,9 @@ def test_rotation_summarises_and_resets_turn_count(spies, monkeypatch, tmp_path)
     assert "PRIOR-CONTEXT-SUMMARY" in (kwargs.get("history_prompt") or "")
     assert captured["scope"]  # summary was actually called
 
-    state = conversations.load_session(conversations.list_scope_keys()[0])
+    state = conversations.load_session(_scope_keys()[0])
     assert state.turn_count == 1  # reset after rotation
 
     # JSONL contains the rotation marker.
-    rows = conversations.tail(conversations.list_scope_keys()[0])
+    rows = conversations._read_tail(_scope_keys()[0])
     assert any(r.get("type") == "event" and r.get("event") == "rotated" for r in rows)
-
-
-# ── `crew sessions` subcommand ───────────────────────────────────────────────
-
-
-def test_sessions_list_empty(spies, capsys):
-    rc = cli.main(["sessions", "list"])
-    assert rc == 0
-    out = capsys.readouterr().out
-    assert "no sessions" in out
-
-
-def test_sessions_list_shows_saved_scopes(spies, capsys, tmp_path):
-    cli.main(["--direct", "hi"])
-    cli.main(["--agent", "coder", "fix"])
-    capsys.readouterr()  # drain prior output
-
-    rc = cli.main(["sessions", "list"])
-    assert rc == 0
-    out = capsys.readouterr().out
-    assert "direct" in out
-    assert "agent:coder" in out
-
-
-def test_sessions_show_tails_jsonl(spies, capsys, tmp_path):
-    spies["direct"].returns = DirectResult(session_id="sess", assistant_text="reply")
-    cli.main(["--direct", "ping"])
-    keys = conversations.list_scope_keys()
-    capsys.readouterr()
-
-    rc = cli.main(["sessions", "show", keys[0]])
-    assert rc == 0
-    out = capsys.readouterr().out
-    rows = [json.loads(line) for line in out.strip().splitlines() if line.strip()]
-    assert any(r.get("type") == "turn" and r["user"] == "ping" for r in rows)
-
-
-def test_sessions_show_resolves_named(spies, capsys, tmp_path):
-    cli.main(["--direct", "--session", "refactor-x", "hi"])
-    capsys.readouterr()
-
-    rc = cli.main(["sessions", "show", "refactor-x"])
-    assert rc == 0
-    out = capsys.readouterr().out
-    assert '"hi"' in out
-
-
-def test_sessions_clear_removes_scope(spies, capsys, tmp_path):
-    cli.main(["--direct", "--session", "refactor-x", "hi"])
-    assert conversations.list_scope_keys()
-    capsys.readouterr()
-
-    rc = cli.main(["sessions", "clear", "refactor-x"])
-    assert rc == 0
-    assert conversations.list_scope_keys() == []
-
-
-def test_sessions_clear_all_drops_everything(spies, capsys, tmp_path):
-    cli.main(["--direct", "a"])
-    cli.main(["--agent", "coder", "b"])
-    assert len(conversations.list_scope_keys()) == 2
-    capsys.readouterr()
-
-    rc = cli.main(["sessions", "clear", "--all"])
-    assert rc == 0
-    assert conversations.list_scope_keys() == []
-
-
-def test_sessions_unknown_command_exits_nonzero(spies, capsys):
-    rc = cli.main(["sessions", "wat"])
-    assert rc == 2
-    err = capsys.readouterr().err
-    assert "unknown sessions command" in err
-
-
-def test_sessions_show_unknown_scope_exits_nonzero(spies, capsys):
-    with pytest.raises(SystemExit) as exc:
-        cli.main(["sessions", "show", "definitely-not-a-scope"])
-    assert exc.value.code == 2
-    err = capsys.readouterr().err
-    assert "no scope matches" in err
