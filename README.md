@@ -5,12 +5,16 @@ for the full design doc and `AGENTS.md` for session-start orientation.
 
 ## Status
 
-**Day 2.8 of the build order** — slash commands now invoke skills
-(`skills/<name>/SKILL.md`) which append their instructions to the session's
-system message. Sits on top of Day 2.5's 3-way intent router (direct /
-agent / pipeline), the `agents/` directory, Day 2's pipeline runner + hook
-registry, and the `daily-standup` pipeline. Plugin bundles (shareable
-directories of skills) are roadmapped for Phase 2+.
+**Day 4-A of the build order.** Level 1 pipelines ship with an isolated
+evaluator + correction loop (`pipelines/incident-triage/`); direct + agent
++ slash modes auto-resume their per-(cwd, mode, [agent|skill]) Copilot
+session and rotate silently every ~20 turns (`--new` starts fresh).
+Sits on top of Day 3 (evaluator + `incident-triage`), Day 2.8 (slash
+commands invoke skills; `skills/debug/`), Day 2.5's 3-way intent router
+(direct / agent / pipeline), and Day 2's pipeline runner + hook registry.
+Pipelines and the evaluator are always one-shot (CLAUDE.md principle #2).
+Plugin bundles (shareable directories of skills) are roadmapped for
+Phase 2+.
 
 ## Install
 
@@ -38,17 +42,22 @@ key. Two options:
 ```bash
 crew "what is 2+2?"                  # router → direct mode
 crew "fix the flaky test in foo.py"  # router → agent:coder (auto-summoned)
-crew "standup prep"                  # router → daily-standup pipeline
+crew "standup prep"                  # router → daily-standup (Level 0)
+crew "triage the API outage"         # router → incident-triage (Level 1)
 crew /debug "why is this failing?"   # skill: appends debug methodology
+crew /help                           # list pipelines, agents, skills
 crew --direct "summarise this"       # force direct mode (skips the router)
 crew --agent coder "refactor X"      # force a specific standalone agent
 crew --pipeline "standup prep"       # force pipeline mode (router picks which)
+crew --new "different topic"         # drop cached memory, start fresh
 ```
 
 **Slash commands** (`/<skill>`) invoke a skill from `skills/<name>/SKILL.md`.
 The skill's instructions are appended to the session's system message and
 the call runs as direct mode underneath — zero LLM cost for the dispatch.
-Unknown names exit with code 2 and list the available skills.
+`/help` is a built-in that prints the local registry (pipelines, agents,
+skills) without calling the SDK. Unknown names exit with code 2 and list
+the available commands.
 
 **Agents** (`agents/*.md`) are persona swaps: one LLM call like direct
 mode, but with the agent's system prompt. No output file, no plan JSON.
@@ -65,10 +74,24 @@ future `crew install <name>@<repo>` command will drop them in. The skill
 registry already supports multiple search roots so no format migration
 is required when plugins land.
 
-**Pipelines** are governed workflows. Runs write a Markdown summary to
-`~/.crew/outputs/<pipeline>/<timestamp>.md` and a run manifest to
-`~/.crew/plans/<session-id>.json`. See `pipelines/standup/README.md` for the
-first pipeline.
+**Pipelines** are governed workflows with plan JSON and per-run output
+files. **Level 0** (`pipelines/standup/`) runs a single generator — hooks
+fire, output goes to `~/.crew/outputs/<pipeline>/<timestamp>.md`, plan
+manifest to `~/.crew/plans/<session-id>.json`. **Level 1**
+(`pipelines/incident-triage/`) adds an isolated evaluator session (fresh
+`CopilotClient`, no MCP, no tools) that grades the generator's output
+against a schema; on a failed verdict the generator is re-spawned with
+the verdict's fix instructions, up to 3 attempts before `on-escalate`
+fires. Each attempt's output is preserved for audit.
+
+**Memory.** Direct + agent + slash modes auto-resume per
+`(cwd, mode, [agent|skill])` scope: the Copilot `session_id` is cached
+in `~/.crew/sessions.json` and turns are appended to
+`~/.crew/conversations/<scope>.jsonl` as rotation input. At
+`CREW_TURN_CAP` turns (default 20) the next call silently summarises
+the tail and starts a fresh SDK session seeded with the summary.
+`--new` forces fresh; `CREW_SUMMARY_MODEL` selects a cheaper model
+for the summary call. Pipelines and the evaluator **never** resume.
 
 ## Tests
 

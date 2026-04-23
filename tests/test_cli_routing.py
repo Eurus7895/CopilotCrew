@@ -13,20 +13,32 @@ import pytest
 from crew import (
     agent_registry,
     cli,
+    conversations,
     intent_router,
     pipeline_registry,
     pipeline_runner,
     skill_registry,
 )
+from crew.direct import DirectResult
 from crew.intent_router import RouteResult
 
 
 class _Spy:
-    def __init__(self):
+    """Async callable that records every invocation.
+
+    ``returns`` is the value the spy will return when awaited. For
+    ``run_direct`` spies this MUST be a ``DirectResult`` (or any object
+    exposing ``session_id`` and ``assistant_text``) so the
+    ``_run_direct_with_memory`` bookkeeping can succeed.
+    """
+
+    def __init__(self, *, returns=None):
         self.called_with: list[tuple[tuple, dict]] = []
+        self.returns = returns
 
     async def __call__(self, *args, **kwargs):
         self.called_with.append((args, kwargs))
+        return self.returns
 
 
 def _fake_pipeline_config(name: str):
@@ -62,8 +74,14 @@ def _fake_agent_config(name: str, prompt: str = "persona-prompt"):
 
 
 @pytest.fixture
-def spies(monkeypatch):
-    direct_spy = _Spy()
+def spies(monkeypatch, tmp_path):
+    # Isolate sessions.json + JSONL writes per test.
+    monkeypatch.setenv("CREW_HOME", str(tmp_path))
+
+    # run_direct must return something the memory wrapper can read.
+    direct_spy = _Spy(
+        returns=DirectResult(session_id="sess_fake", assistant_text="ok")
+    )
     runner_spy = _Spy()
     router_spy = _Spy()
 
@@ -182,7 +200,12 @@ def spies(monkeypatch):
 def test_direct_flag_skips_router(spies):
     rc = cli.main(["--direct", "hello"])
     assert rc == 0
-    assert spies["direct"].called_with == [(("hello",), {"model": None})]
+    assert len(spies["direct"].called_with) == 1
+    args, kwargs = spies["direct"].called_with[0]
+    assert args == ("hello",)
+    assert kwargs["model"] is None
+    assert kwargs.get("agent_prompt") is None
+    assert kwargs.get("skill_prompt") is None
     assert spies["router"].called_with == []
     assert spies["runner"].called_with == []
 
@@ -205,7 +228,10 @@ def test_router_direct_verdict_dispatches_to_direct(spies):
     assert len(spies["router"].called_with) == 1
     (_args, kwargs) = spies["router"].called_with[0]
     assert "require_pipeline" not in kwargs or kwargs["require_pipeline"] is False
-    assert spies["direct"].called_with == [(("what time is it?",), {"model": None})]
+    assert len(spies["direct"].called_with) == 1
+    args, kwargs = spies["direct"].called_with[0]
+    assert args == ("what time is it?",)
+    assert kwargs["model"] is None
     assert spies["runner"].called_with == []
 
 
@@ -316,7 +342,9 @@ def test_direct_flag_sends_slash_prompt_verbatim(spies):
     # `--direct "/debug"` should NOT parse the slash — explicit override wins.
     rc = cli.main(["--direct", "/debug"])
     assert rc == 0
-    assert spies["direct"].called_with == [(("/debug",), {"model": None})]
+    assert len(spies["direct"].called_with) == 1
+    args, _ = spies["direct"].called_with[0]
+    assert args == ("/debug",)
     assert spies["runner"].called_with == []
     assert spies["router"].called_with == []
 
@@ -330,3 +358,164 @@ def test_pipeline_flag_with_slash_still_uses_router(spies):
     # Router IS called because --pipeline was passed; slash is ignored.
     assert len(spies["router"].called_with) == 1
     assert len(spies["runner"].called_with) == 1
+
+
+# ── /help built-in ───────────────────────────────────────────────────────────
+
+
+def test_slash_help_prints_registry_and_skips_sdk(spies, capsys):
+    rc = cli.main(["/help"])
+    assert rc == 0
+    # No SDK call on any path.
+    assert spies["direct"].called_with == []
+    assert spies["router"].called_with == []
+    assert spies["runner"].called_with == []
+
+    out = capsys.readouterr().out
+    # All three sections appear, populated from the mocked discoveries.
+    assert "Pipelines" in out
+    assert "daily-standup" in out
+    assert "Level 0" in out
+    assert "Agents" in out
+    assert "coder" in out
+    # Non-standalone agents are filtered out.
+    assert "internal-only" not in out
+    assert "Skills" in out
+    assert "/debug" in out
+
+
+def test_slash_help_extra_args_ignored(spies, capsys):
+    # `/help anything else` still prints the registry — extra args are no-ops
+    # because /help is a deterministic dispatcher, not a skill.
+    rc = cli.main(["/help", "pipelines"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "Pipelines" in out
+    assert spies["direct"].called_with == []
+
+
+def test_slash_unknown_skill_advertises_help(spies, capsys):
+    with pytest.raises(SystemExit):
+        cli.main(["/nope"])
+    err = capsys.readouterr().err
+    assert "/help" in err
+
+
+def test_slash_help_works_with_empty_skill_registry(monkeypatch, spies, capsys):
+    monkeypatch.setattr(skill_registry, "discover", lambda *a, **k: [])
+    rc = cli.main(["/help"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    # Pipelines + agents still listed; skills section is shown but empty.
+    assert "daily-standup" in out
+    assert "(none registered" in out
+
+
+# ── Memory wrapper (Day 4-A) ─────────────────────────────────────────────────
+
+
+def _scope_keys() -> list[str]:
+    """Peek at sessions.json directly — the public API intentionally
+    doesn't expose scope listing (that was Day 4-A surplus surface)."""
+    return sorted(conversations._load_all().keys())
+
+
+def test_direct_first_call_starts_fresh_session(spies, tmp_path):
+    rc = cli.main(["--direct", "hello"])
+    assert rc == 0
+    args, kwargs = spies["direct"].called_with[0]
+    # No cached session_id on first call.
+    assert kwargs.get("session_id") is None
+    # JSONL row + sessions.json entry written under tmp CREW_HOME.
+    assert (tmp_path / "sessions.json").exists()
+    assert len(_scope_keys()) == 1
+
+
+def test_direct_second_call_resumes_session(spies, tmp_path):
+    spies["direct"].returns = DirectResult(session_id="sess_aaa", assistant_text="hi")
+    cli.main(["--direct", "first"])
+    spies["direct"].called_with.clear()
+    spies["direct"].returns = DirectResult(session_id="sess_aaa", assistant_text="ok")
+
+    cli.main(["--direct", "second"])
+    args, kwargs = spies["direct"].called_with[0]
+    # Second call MUST pass the cached session_id back to run_direct.
+    assert kwargs["session_id"] == "sess_aaa"
+
+    state = conversations.load_session(_scope_keys()[0])
+    assert state.turn_count == 2
+
+
+def test_new_flag_drops_cached_session(spies, tmp_path):
+    cli.main(["--direct", "first"])
+    spies["direct"].called_with.clear()
+
+    cli.main(["--direct", "--new", "fresh start"])
+    args, kwargs = spies["direct"].called_with[0]
+    assert kwargs.get("session_id") is None
+    state = conversations.load_session(_scope_keys()[0])
+    # turn_count resets to 1 because we forced a fresh session.
+    assert state.turn_count == 1
+
+
+def test_agent_mode_uses_separate_scope_from_direct(spies, tmp_path):
+    cli.main(["--direct", "hi"])
+    cli.main(["--agent", "coder", "fix bug"])
+    # Two distinct scopes: direct + agent:coder.
+    assert len(_scope_keys()) == 2
+
+
+def test_agent_mode_carries_persona_in_scope(spies, tmp_path):
+    cli.main(["--agent", "coder", "fix bug"])
+    state = conversations.load_session(_scope_keys()[0])
+    assert state.mode == "agent"
+    assert state.agent == "coder"
+
+
+def test_slash_uses_skill_scoped_memory(spies, tmp_path):
+    cli.main(["/debug", "why is my test failing"])
+    state = conversations.load_session(_scope_keys()[0])
+    assert state.mode == "slash"
+    assert state.agent == "debug"  # skill_name lives in the agent slot
+
+
+def test_pipeline_does_not_touch_sessions_json(spies, tmp_path):
+    spies["router_stub"].verdict = RouteResult(
+        mode="pipeline", pipeline="daily-standup", reason="match"
+    )
+    cli.main(["standup prep"])
+    # Pipelines stay one-shot — no memory bookkeeping.
+    assert _scope_keys() == []
+    assert spies["runner"].called_with  # but the pipeline DID run
+
+
+def test_rotation_summarises_and_resets_turn_count(spies, monkeypatch, tmp_path):
+    captured: dict[str, str] = {}
+
+    async def fake_summary(scope, **kwargs):
+        captured["scope"] = scope
+        captured["model"] = kwargs.get("model")
+        return "PRIOR-CONTEXT-SUMMARY"
+
+    monkeypatch.setattr(conversations, "summarize_for_rotation", fake_summary)
+    monkeypatch.setattr(conversations, "CAP", 3)
+
+    # Three turns to fill the cap.
+    cli.main(["--direct", "t1"])
+    cli.main(["--direct", "t2"])
+    cli.main(["--direct", "t3"])
+    spies["direct"].called_with.clear()
+
+    # Fourth call rotates: should call summarize, then start fresh.
+    cli.main(["--direct", "t4"])
+    args, kwargs = spies["direct"].called_with[0]
+    assert kwargs.get("session_id") is None  # fresh SDK session
+    assert "PRIOR-CONTEXT-SUMMARY" in (kwargs.get("history_prompt") or "")
+    assert captured["scope"]  # summary was actually called
+
+    state = conversations.load_session(_scope_keys()[0])
+    assert state.turn_count == 1  # reset after rotation
+
+    # JSONL contains the rotation marker.
+    rows = conversations._read_tail(_scope_keys()[0])
+    assert any(r.get("type") == "event" and r.get("event") == "rotated" for r in rows)

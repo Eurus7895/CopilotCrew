@@ -57,6 +57,11 @@ class PipelineConfig:
     allowed_tools: list[str]
     output_subdir: str
     path: Path
+    evaluator_path: Path | None = None
+    evaluator_frontmatter: dict | None = None
+    evaluator_prompt: str | None = None
+    schema_path: Path | None = None
+    schema_text: str | None = None
     raw: dict = field(default_factory=dict)
 
 
@@ -160,6 +165,29 @@ def load_pipeline(
     description = str(data.get("description", "")).strip()
     level = int(data.get("level", 0))
 
+    evaluator_rel = data.get("evaluator") or "agents/evaluator.md"
+    evaluator_path = pipeline_dir / evaluator_rel
+    evaluator_frontmatter: dict | None = None
+    evaluator_prompt: str | None = None
+    if evaluator_path.exists():
+        evaluator_frontmatter, evaluator_prompt = load_agent_md(evaluator_path)
+    else:
+        if level >= 1:
+            raise FileNotFoundError(
+                f"evaluator file missing for Level {level} pipeline: {evaluator_path}"
+            )
+        evaluator_path = None
+
+    schema_rel = data.get("schema")
+    schema_path: Path | None = None
+    schema_text: str | None = None
+    if schema_rel:
+        candidate = pipeline_dir / schema_rel
+        if not candidate.exists():
+            raise FileNotFoundError(f"schema file missing: {candidate}")
+        schema_path = candidate
+        schema_text = candidate.read_text(encoding="utf-8")
+
     return PipelineConfig(
         name=resolved_name,
         level=level,
@@ -171,5 +199,10 @@ def load_pipeline(
         allowed_tools=allowed_tools,
         output_subdir=output_subdir,
         path=pipeline_dir,
+        evaluator_path=evaluator_path,
+        evaluator_frontmatter=evaluator_frontmatter,
+        evaluator_prompt=evaluator_prompt,
+        schema_path=schema_path,
+        schema_text=schema_text,
         raw=data,
     )

@@ -1,0 +1,10 @@
+name: demo-l1
+description: Fixture Level 1 pipeline for runner / evaluator tests.
+level: 1
+agent: agents/generator.md
+evaluator: agents/evaluator.md
+schema: schemas/output.json
+mcp: []
+allowed_tools:
+  - read
+output_subdir: demo-l1

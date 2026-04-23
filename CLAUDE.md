@@ -19,13 +19,16 @@ pipelines for team workflows that need structure.**
 
 ## What Crew Is
 
-Two modes, one interface. The router decides which mode based on the request.
+Two fundamental modes (chatty vs governed), one interface. The router
+decides which mode based on the request. Since Day 2.5 the chatty side
+has two flavours — generic assistant (`direct`) and persona swap
+(`agent:{name}`); the router picks whichever matches best.
 
 ```
 User types anything
         ↓
 Intent Router (one LLM call)
-  classifies: direct | pipeline
+  classifies: direct | agent:{name} | pipeline:{name}
         ↓
   ┌─────────────────────┬────────────────────────────────┐
   │  DIRECT MODE        │  PIPELINE MODE                 │
@@ -409,21 +412,29 @@ and get a direct answer without running the standup pipeline.
 ### Direct Mode
 
 ```python
-async def run_direct(user_input: str):
+async def run_direct(
+    user_input: str,
+    *,
+    session_id: str | None = None,   # Day 4-A: resume a prior session
+    ...
+) -> DirectResult:                   # (session_id, assistant_text)
     """Fastest path. No pipeline, no governance. Just answer."""
-    client = CopilotClient()
-    await client.start()
-    session = await client.create_session({
-        "instructions": "You are a helpful team assistant.",
-        "mcp_servers": load_global_mcp(),    # MCP available for data lookups
-        "on_permission_request": PermissionHandler.approve_all,
-    })
-
-    # Stream the response directly to terminal
-    session.on(lambda event: streamer.handle(event))
-    await session.send_and_wait({"prompt": user_input})
-    await client.stop()
-    # No plan JSON, no SQLite log, no progress.md — just answer and done
+    async with CopilotClient() as client:
+        async with await client.create_session(
+            session_id=session_id,               # None → fresh session
+            on_permission_request=PermissionHandler.approve_all,
+            enable_config_discovery=True,        # MCP available
+            streaming=True,
+            ...
+        ) as session:
+            session.on(on_event)                 # streams to stdout
+            await session.send_and_wait(user_input)
+            return DirectResult(
+                session_id=session.session_id,
+                assistant_text=...,
+            )
+    # No plan JSON. Day 4-A added per-(cwd, mode, [agent]) session_id
+    # caching in ~/.crew/sessions.json so the next invocation resumes.
 ```
 
 ### The Evaluator Pattern (Level 1)
@@ -498,7 +509,17 @@ agent loader.
     logs.db                      SQLite audit log (WAL mode)
     progress.md                  session notes — append per run, read at start
     config.yaml                  auth, model, output preferences
+    sessions.json                per-scope Copilot session_id cache (Day 4-A)
+    conversations/<scope>.jsonl  per-scope turn log (audit trail; Day 4-A)
 ```
+
+Env vars affecting state:
+* `CREW_HOME` — root directory (default `~/.crew`)
+* `CREW_TURN_CAP` — turns per chatty session before summary rotation
+  (default 20)
+* `CREW_SUMMARY_MODEL` — model for the rotation summary call (default:
+  same as the user's model; set to a smaller / cheaper model to keep
+  context-management work off the primary model)
 
 ---
 
@@ -565,13 +586,66 @@ before Day 3's evaluator work:
 
 ### Day 3 — Evaluator + incident-triage (Level 1)
 ```
-[ ] evaluator.py: separate CopilotClient factory + verdict parser
-[ ] pipeline_runner.py Level 1 execution with isolated evaluator
-[ ] Hook injection: on-eval-fail, on-escalate
-[ ] Test: evaluator grades in fresh session, correction loop fires
+[x] evaluator.py: separate CopilotClient factory + verdict parser
+[x] pipeline_runner.py Level 1 execution with isolated evaluator
+[x] Hook injection: on-eval-fail, on-escalate
+[x] Test: evaluator grades in fresh session, correction loop fires
 ```
 
-### Day 4 — Streaming + remaining pipelines
+Implementation notes:
+
+* The evaluator receives the generator's output **text** inline, not a
+  file path. Its session has no MCP and no permission handler, so it
+  cannot read files anyway — passing the path would buy nothing. This
+  stays faithful to "fresh eyes, fresh context".
+* Evaluator session uses `enable_config_discovery=False`. No MCP, no
+  skill, no tools. System message is `evaluator_prompt` plus the
+  pipeline's `schema_text`, in `replace` mode.
+* Each attempt's output is preserved on disk
+  (`~/.crew/outputs/<pipeline>/<ts>-<uid>-attempt{N}.md`) so a failed
+  run is auditable. The single per-run plan JSON contains the full
+  `attempts` array (per-attempt verdict, output path, timestamps) and
+  an `escalated` flag.
+* `run_pipeline(config, ...)` dispatches by `config.level` (0 → Level
+  0; 1 → Level 1; 2+ → ValueError). The CLI now calls `run_pipeline`
+  exclusively; `run_level_0` / `run_level_1` stay exported for tests.
+* `crew/harness/correction_loop.py` (the SQLite-stage harness ported
+  from CopilotHarness) stays dormant — its plan→design→code→review
+  contract doesn't fit the generator/evaluator loop. The Day 3 loop
+  lives inside `pipeline_runner.run_level_1` instead.
+
+### Day 4-A — Bounded session continuity for chatty modes
+```
+[x] crew/conversations.py: per-scope session_id cache + rotation log
+[x] crew/direct.py: accept session_id, return DirectResult (id + text)
+[x] crew/cli.py: --new flag + memory wrapper (zero additional CLI surface)
+[x] Summary rotation when CREW_TURN_CAP turns reached (CREW_SUMMARY_MODEL
+    selects the summariser model; default: user's current model)
+[x] Pipelines + evaluator stay one-shot (runtime guard tests)
+```
+
+Implementation notes:
+
+* **Minimal surface by design.** Users don't manage sessions — they just
+  chat. The only user-facing knob is `--new` (forget and start over).
+  An earlier draft added `--session NAME`, `--no-memory`, and a
+  `crew sessions {list,show,clear}` subcommand; all three were dropped
+  as surplus surface once the real requirement became clear.
+* **Scope = (mode, agent_or_skill, cwd)** hashed for filesystem safety.
+  The readable cwd is stored inside the session value for audit but is
+  not user-facing.
+* **Slash commands carry per-skill memory.** `scope = ("slash",
+  skill_name, cwd)` so `/debug` in projA and `/debug` in projB are
+  separate threads, and neither pollutes bare direct mode.
+* **JSONL is rotation input, not a user surface.** Each turn appends
+  one row to `~/.crew/conversations/<scope>.jsonl`; rotation reads the
+  tail to produce the handoff summary, then writes a `rotated` event
+  marker. The log is internal plumbing — no CLI exposes it.
+* **Pipelines + evaluator NEVER resume.** Principle #2 is non-negotiable.
+  Two runtime guard tests assert `session_id` never appears in
+  `create_session` kwargs from `pipeline_runner` or the evaluator.
+
+### Day 4-B — Streaming + remaining pipelines
 ```
 [ ] streamer.py: terminal output + summary mode
 [ ] ticket-refinement, code-review-routing, release-notes
@@ -693,6 +767,6 @@ architecture primitives, different execution model.
 
 *Updated: April 2026*
 *Product: Crew*
-*Phase: Day 2.8 shipped; Day 3 next*
+*Phase: Day 4-A shipped; Day 4-B next*
 *First user: Current team*
-*Next: Day 3 — evaluator + incident-triage (Level 1)*
+*Next: Day 4-B — streamer + remaining pipelines (ticket-refinement, code-review-routing, release-notes)*
