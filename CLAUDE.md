@@ -19,13 +19,16 @@ pipelines for team workflows that need structure.**
 
 ## What Crew Is
 
-Two modes, one interface. The router decides which mode based on the request.
+Two fundamental modes (chatty vs governed), one interface. The router
+decides which mode based on the request. Since Day 2.5 the chatty side
+has two flavours — generic assistant (`direct`) and persona swap
+(`agent:{name}`); the router picks whichever matches best.
 
 ```
 User types anything
         ↓
 Intent Router (one LLM call)
-  classifies: direct | pipeline
+  classifies: direct | agent:{name} | pipeline:{name}
         ↓
   ┌─────────────────────┬────────────────────────────────┐
   │  DIRECT MODE        │  PIPELINE MODE                 │
@@ -409,21 +412,29 @@ and get a direct answer without running the standup pipeline.
 ### Direct Mode
 
 ```python
-async def run_direct(user_input: str):
+async def run_direct(
+    user_input: str,
+    *,
+    session_id: str | None = None,   # Day 4-A: resume a prior session
+    ...
+) -> DirectResult:                   # (session_id, assistant_text)
     """Fastest path. No pipeline, no governance. Just answer."""
-    client = CopilotClient()
-    await client.start()
-    session = await client.create_session({
-        "instructions": "You are a helpful team assistant.",
-        "mcp_servers": load_global_mcp(),    # MCP available for data lookups
-        "on_permission_request": PermissionHandler.approve_all,
-    })
-
-    # Stream the response directly to terminal
-    session.on(lambda event: streamer.handle(event))
-    await session.send_and_wait({"prompt": user_input})
-    await client.stop()
-    # No plan JSON, no SQLite log, no progress.md — just answer and done
+    async with CopilotClient() as client:
+        async with await client.create_session(
+            session_id=session_id,               # None → fresh session
+            on_permission_request=PermissionHandler.approve_all,
+            enable_config_discovery=True,        # MCP available
+            streaming=True,
+            ...
+        ) as session:
+            session.on(on_event)                 # streams to stdout
+            await session.send_and_wait(user_input)
+            return DirectResult(
+                session_id=session.session_id,
+                assistant_text=...,
+            )
+    # No plan JSON. Day 4-A added per-(cwd, mode, [agent]) session_id
+    # caching in ~/.crew/sessions.json so the next invocation resumes.
 ```
 
 ### The Evaluator Pattern (Level 1)
