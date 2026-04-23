@@ -83,9 +83,13 @@ def spies(monkeypatch):
             )
         ],
     )
-    monkeypatch.setattr(
-        pipeline_registry, "load_pipeline", lambda name, **kw: _fake_pipeline_config(name)
-    )
+
+    def _load_pipeline(name, **kw):
+        if name == "daily-standup":
+            return _fake_pipeline_config(name)
+        raise pipeline_registry.PipelineNotFound(name)
+
+    monkeypatch.setattr(pipeline_registry, "load_pipeline", _load_pipeline)
     monkeypatch.setattr(
         agent_registry,
         "discover",
@@ -96,12 +100,37 @@ def spies(monkeypatch):
                 standalone=True,
                 subagent_enabled=False,
                 path=pathlib.Path("/tmp/agents/coder.md"),
-            )
+            ),
+            agent_registry.AgentInfo(
+                name="internal-only",
+                description="subagent",
+                standalone=False,
+                subagent_enabled=True,
+                path=pathlib.Path("/tmp/agents/internal.md"),
+            ),
         ],
     )
-    monkeypatch.setattr(
-        agent_registry, "load_agent", lambda name, **kw: _fake_agent_config(name)
-    )
+
+    def _load_agent(name, **kw):
+        if name == "coder":
+            return _fake_agent_config(name)
+        if name == "internal-only":
+            return agent_registry.AgentConfig(
+                name="internal-only",
+                description="subagent",
+                prompt="internal",
+                model=None,
+                allowed_tools=[],
+                frontmatter={},
+                path=pathlib.Path("/tmp/agents/internal.md"),
+                standalone=False,
+                subagent_enabled=True,
+                subagent_infer=True,
+                raw={},
+            )
+        raise agent_registry.AgentNotFound(name)
+
+    monkeypatch.setattr(agent_registry, "load_agent", _load_agent)
 
     return dict(
         direct=direct_spy,
@@ -192,3 +221,80 @@ def test_mode_flags_are_mutually_exclusive():
         cli.main(["--direct", "--agent", "coder", "x"])
     with pytest.raises(SystemExit):
         cli.main(["--pipeline", "--agent", "coder", "x"])
+
+
+# ── Slash command dispatch ───────────────────────────────────────────────────
+
+
+def test_slash_pipeline_bypasses_router(spies):
+    rc = cli.main(["/daily-standup", "prep"])
+    assert rc == 0
+    # Router is never invoked — zero LLM cost.
+    assert spies["router"].called_with == []
+    assert spies["direct"].called_with == []
+    assert len(spies["runner"].called_with) == 1
+    (args, kwargs) = spies["runner"].called_with[0]
+    # Pipeline config is the first positional; "prep" is the user input,
+    # slash-stripped.
+    assert args[0].name == "daily-standup"
+    assert args[1] == "prep"
+    assert kwargs["route_result"]["mode"] == "slash"
+    assert kwargs["route_result"]["pipeline"] == "daily-standup"
+
+
+def test_slash_pipeline_with_no_args_sends_empty_prompt(spies):
+    rc = cli.main(["/daily-standup"])
+    assert rc == 0
+    assert spies["router"].called_with == []
+    assert len(spies["runner"].called_with) == 1
+    (args, _kwargs) = spies["runner"].called_with[0]
+    assert args[1] == ""
+
+
+def test_slash_agent_bypasses_router(spies):
+    rc = cli.main(["/coder", "refactor", "this"])
+    assert rc == 0
+    assert spies["router"].called_with == []
+    assert spies["runner"].called_with == []
+    assert len(spies["direct"].called_with) == 1
+    (args, kwargs) = spies["direct"].called_with[0]
+    assert args == ("refactor this",)
+    assert kwargs["agent_prompt"] == "persona-prompt"
+
+
+def test_slash_unknown_command_exits_nonzero(spies, capsys):
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["/nope", "something"])
+    assert exc.value.code == 2
+    err = capsys.readouterr().err
+    assert "unknown command: /nope" in err
+    assert "/daily-standup" in err
+    assert "/coder" in err
+
+
+def test_slash_subagent_only_rejected(spies, capsys):
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["/internal-only", "x"])
+    assert exc.value.code == 2
+    err = capsys.readouterr().err
+    assert "subagent-only" in err
+
+
+def test_direct_flag_sends_slash_prompt_verbatim(spies):
+    # `--direct "/standup"` should NOT parse the slash — explicit override wins.
+    rc = cli.main(["--direct", "/daily-standup"])
+    assert rc == 0
+    assert spies["direct"].called_with == [(("/daily-standup",), {"model": None})]
+    assert spies["runner"].called_with == []
+    assert spies["router"].called_with == []
+
+
+def test_pipeline_flag_with_slash_still_uses_router(spies):
+    spies["router_stub"].verdict = RouteResult(
+        mode="pipeline", pipeline="daily-standup", reason="forced"
+    )
+    rc = cli.main(["--pipeline", "/daily-standup"])
+    assert rc == 0
+    # Router IS called because --pipeline was passed; slash is ignored.
+    assert len(spies["router"].called_with) == 1
+    assert len(spies["runner"].called_with) == 1

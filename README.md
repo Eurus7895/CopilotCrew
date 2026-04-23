@@ -5,10 +5,10 @@ for the full design doc and `AGENTS.md` for session-start orientation.
 
 ## Status
 
-**Day 2.5 of the build order** — intent router is now 3-way (direct /
-agent / pipeline), with standalone agent dispatch and the `agents/`
-directory on top of Day 2's pipeline runner, hook registry, and
-`daily-standup` pipeline.
+**Day 2.75 of the build order** — slash commands (`/name`) for zero-cost
+deterministic dispatch, on top of Day 2.5's 3-way intent router
+(direct / agent / pipeline), the standalone `agents/` directory, Day 2's
+pipeline runner + hook registry, and the `daily-standup` pipeline.
 
 ## Install
 
@@ -37,10 +37,17 @@ key. Two options:
 crew "what is 2+2?"                # router → direct mode
 crew "fix the flaky test in foo.py" # router → agent:coder (auto-summoned)
 crew "standup prep"                # router → daily-standup pipeline
+crew /daily-standup                # slash command: zero-cost, skips the router
+crew /coder "refactor X"           # slash command: dispatches to agents/coder.md
 crew --direct "summarise this"     # force direct mode (skips the router)
 crew --agent coder "refactor X"    # force a specific standalone agent
 crew --pipeline "standup prep"     # force pipeline mode (router picks which)
 ```
+
+**Slash commands** (`/<name>`) match against the pipeline registry first,
+then the standalone agent registry. They bypass the intent router entirely
+— zero LLM cost for the dispatch. Unknown names exit with code 2 and list
+the available commands.
 
 **Agents** (`agents/*.md`) are persona swaps: one LLM call like direct
 mode, but with the agent's system prompt. No output file, no plan JSON.

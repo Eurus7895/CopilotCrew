@@ -1,8 +1,10 @@
 """`crew` CLI entry point.
 
 The router decides between direct mode, a standalone agent, or a pipeline
-for every non-flagged invocation. ``--direct``, ``--agent NAME``, and
-``--pipeline`` force the respective modes (per CLAUDE.md "Execution Modes").
+for every non-flagged, non-slash invocation. ``--direct``,
+``--agent NAME``, and ``--pipeline`` force the respective modes. Prompts
+starting with ``/`` are parsed as slash commands and bypass the router
+entirely (zero-cost deterministic dispatch).
 """
 
 from __future__ import annotations
@@ -42,6 +44,70 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+async def _dispatch_slash(prompt: str, *, model: str | None) -> None:
+    """Parse ``/<name> [rest]`` and dispatch without calling the router.
+
+    Lookup order: pipelines, then standalone agents. Unknown names exit
+    with code 2 and print the available commands. Called only when the
+    user typed a slash command AND did not pass an override flag.
+    """
+    name, _, rest = prompt[1:].partition(" ")
+    name = name.strip()
+    rest = rest.strip()
+
+    if not name:
+        _slash_usage_error("empty command after /")
+        return
+
+    try:
+        config = pipeline_registry.load_pipeline(name)
+    except pipeline_registry.PipelineNotFound:
+        config = None
+
+    if config is not None:
+        route_dump = {
+            "mode": "slash",
+            "pipeline": config.name,
+            "agent": None,
+            "params": {},
+            "reason": "slash command",
+        }
+        await pipeline_runner.run_level_0(
+            config, rest, model=model, route_result=route_dump
+        )
+        return
+
+    try:
+        agent_cfg = agent_registry.load_agent(name)
+    except agent_registry.AgentNotFound:
+        agent_cfg = None
+
+    if agent_cfg is not None:
+        if not agent_cfg.standalone:
+            _slash_usage_error(
+                f"/{name} is a subagent-only agent and cannot be invoked directly"
+            )
+            return
+        await run_direct(rest, model=model, agent_prompt=agent_cfg.prompt)
+        return
+
+    _slash_usage_error(f"unknown command: /{name}")
+
+
+def _available_slash_commands() -> list[str]:
+    pipelines = [p.name for p in pipeline_registry.discover()]
+    agents = [a.name for a in agent_registry.discover() if a.standalone]
+    return sorted({*pipelines, *agents})
+
+
+def _slash_usage_error(msg: str) -> None:
+    available = _available_slash_commands()
+    sys.stderr.write(f"crew: {msg}\n")
+    if available:
+        sys.stderr.write("available: " + ", ".join(f"/{c}" for c in available) + "\n")
+    raise SystemExit(2)
+
+
 async def _dispatch(
     prompt: str,
     *,
@@ -57,6 +123,13 @@ async def _dispatch(
     if agent is not None:
         agent_cfg = agent_registry.load_agent(agent)
         await run_direct(prompt, model=model, agent_prompt=agent_cfg.prompt)
+        return
+
+    # Slash commands short-circuit the router when no override flag was
+    # passed. Explicit overrides above take precedence so the user can
+    # send a literal prompt starting with "/" via `--direct "/foo"`.
+    if not pipeline and prompt.startswith("/"):
+        await _dispatch_slash(prompt, model=model)
         return
 
     pipelines = pipeline_registry.discover()

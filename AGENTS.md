@@ -5,8 +5,9 @@ the Copilot SDK. Read `CLAUDE.md` for the full design doc.
 
 ## Project shape
 
-- `crew/cli.py` — `crew "<prompt>"` entry point; dispatches via the intent
-  router unless `--direct` / `--agent NAME` / `--pipeline` forces a mode
+- `crew/cli.py` — `crew "<prompt>"` entry point. Prompts starting with `/`
+  are slash commands (zero-cost dispatch); otherwise the intent router
+  runs unless `--direct` / `--agent NAME` / `--pipeline` forces a mode
 - `crew/direct.py` — direct mode: single LLM call, no pipeline, no
   governance. Accepts an optional `agent_prompt` to swap the system message
   for a standalone-agent persona
@@ -27,10 +28,10 @@ the Copilot SDK. Read `CLAUDE.md` for the full design doc.
 - `pipelines/` — self-contained pipeline directories; currently
   `pipelines/standup/` (Level 0)
 
-## Three modes
+## Three modes + one fast path
 
-The intent router classifies every request as `direct`, `agent:{name}`, or
-`pipeline:{name}`.
+The intent router classifies every non-slash, non-flagged request as
+`direct`, `agent:{name}`, or `pipeline:{name}`.
 
 - **Direct** — one Copilot SDK call with a generic assistant prompt, MCP
   available, streamed to terminal. No output file.
@@ -39,11 +40,16 @@ The intent router classifies every request as `direct`, `agent:{name}`, or
 - **Pipeline** — governed workflow. Level 0 runs a single generator with
   hooks + plan JSON; Level 1+ adds an isolated evaluator on Day 3.
 
+**Slash commands** (`/<name>`) bypass the router entirely and dispatch
+directly to the matching pipeline or standalone agent — zero LLM cost.
+Override flags (`--direct`, `--agent`, `--pipeline`) take precedence over
+slash parsing.
+
 See CLAUDE.md "Agent Complexity Model".
 
 ## Build status
 
-Currently on **Day 2.5** of the build order. Intent router upgraded to
-3-way classification (direct / agent / pipeline), standalone agent
-dispatch, and the `agents/` directory have landed on top of Day 2. Day 3+
-adds the evaluator, correction loop, and subagent spawning.
+Currently on **Day 2.75** of the build order. Slash commands landed on top
+of Day 2.5 (3-way router + `agents/` directory) and Day 2 (pipeline runner
++ hooks + `daily-standup`). Day 3+ adds the evaluator, correction loop,
+and subagent spawning.
