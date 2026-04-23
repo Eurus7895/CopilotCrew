@@ -3,8 +3,10 @@
 The router decides between direct mode, a standalone agent, or a pipeline
 for every non-flagged, non-slash invocation. ``--direct``,
 ``--agent NAME``, and ``--pipeline`` force the respective modes. Prompts
-starting with ``/`` are parsed as slash commands and bypass the router
-entirely (zero-cost deterministic dispatch).
+starting with ``/`` are parsed as slash commands that invoke skills —
+the skill's instructions are appended to the session's system message so
+the call proceeds with the capability in-context. Slash dispatch bypasses
+the intent router (zero LLM cost).
 """
 
 from __future__ import annotations
@@ -13,7 +15,13 @@ import argparse
 import asyncio
 import sys
 
-from crew import agent_registry, intent_router, pipeline_registry, pipeline_runner
+from crew import (
+    agent_registry,
+    intent_router,
+    pipeline_registry,
+    pipeline_runner,
+    skill_registry,
+)
 from crew.direct import run_direct
 
 
@@ -45,11 +53,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 async def _dispatch_slash(prompt: str, *, model: str | None) -> None:
-    """Parse ``/<name> [rest]`` and dispatch without calling the router.
+    """Parse ``/<skill-name> [rest]`` and dispatch without calling the router.
 
-    Lookup order: pipelines, then standalone agents. Unknown names exit
-    with code 2 and print the available commands. Called only when the
-    user typed a slash command AND did not pass an override flag.
+    A slash command invokes a skill: the skill's instructions are appended
+    to the session's system message, and the rest of the prompt is sent
+    as the user input. Direct mode is used (no agent persona, no pipeline
+    governance). Unknown skills exit with code 2 and list the available
+    commands.
     """
     name, _, rest = prompt[1:].partition(" ")
     name = name.strip()
@@ -60,51 +70,27 @@ async def _dispatch_slash(prompt: str, *, model: str | None) -> None:
         return
 
     try:
-        config = pipeline_registry.load_pipeline(name)
-    except pipeline_registry.PipelineNotFound:
-        config = None
-
-    if config is not None:
-        route_dump = {
-            "mode": "slash",
-            "pipeline": config.name,
-            "agent": None,
-            "params": {},
-            "reason": "slash command",
-        }
-        await pipeline_runner.run_level_0(
-            config, rest, model=model, route_result=route_dump
-        )
+        skill = skill_registry.load_skill(name)
+    except skill_registry.SkillNotFound:
+        _slash_usage_error(f"unknown skill: /{name}")
         return
 
-    try:
-        agent_cfg = agent_registry.load_agent(name)
-    except agent_registry.AgentNotFound:
-        agent_cfg = None
-
-    if agent_cfg is not None:
-        if not agent_cfg.standalone:
-            _slash_usage_error(
-                f"/{name} is a subagent-only agent and cannot be invoked directly"
-            )
-            return
-        await run_direct(rest, model=model, agent_prompt=agent_cfg.prompt)
-        return
-
-    _slash_usage_error(f"unknown command: /{name}")
+    await run_direct(rest, model=model, skill_prompt=skill.instructions)
 
 
 def _available_slash_commands() -> list[str]:
-    pipelines = [p.name for p in pipeline_registry.discover()]
-    agents = [a.name for a in agent_registry.discover() if a.standalone]
-    return sorted({*pipelines, *agents})
+    return sorted(s.name for s in skill_registry.discover())
 
 
 def _slash_usage_error(msg: str) -> None:
     available = _available_slash_commands()
     sys.stderr.write(f"crew: {msg}\n")
     if available:
-        sys.stderr.write("available: " + ", ".join(f"/{c}" for c in available) + "\n")
+        sys.stderr.write(
+            "available skills: " + ", ".join(f"/{c}" for c in available) + "\n"
+        )
+    else:
+        sys.stderr.write("no skills registered (add one under skills/<name>/SKILL.md)\n")
     raise SystemExit(2)
 
 

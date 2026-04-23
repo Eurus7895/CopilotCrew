@@ -581,20 +581,29 @@ Enforced via `pre-tool-use` hook — deterministic, not prompt-based.
 
 Designed now. Not building in v1.
 
-### Phase 2 — Pipeline Install (Month 2+)
-`crew install` = copy a pipeline directory. The v1 format IS the install format.
+### Phase 2 — Plugin + Pipeline Install (Month 2+)
+`crew install` = copy a directory into the project. A plugin bundles
+multiple skills (and optionally agents, pipelines, hooks) under
+`plugins/<name>/` with a `plugin.yaml` manifest and nested `skills/`,
+`agents/`, `pipelines/` directories. The v1 file formats ARE the install
+formats — no migration. The skill registry already supports multiple
+search roots (local `skills/` + any `plugins/*/skills/`), so activating
+plugin discovery is a registry-wiring change, not a format redesign.
 
 ### Phase 3 — Auto-Invoke Skills (Month 3+)
 Skills register trigger descriptions in frontmatter. LLM decides which
 to load — no classifier, no regex. Same mechanism as Claude Code skills.
+Day 2.8 shipped explicit skill invocation via `/skill-name`; Phase 3 adds
+the auto-invoke path without changing the skill file format.
 
 ### Phase 4 — Custom Hooks (Month 3+)
 Hooks become executable: `type: command` (shell), `type: http` (webhook),
 `type: agent` (spawn agent to handle event). Follows Claude Code hook types.
 
 ### Phase 5 — Plugin Marketplace (Month 6+)
-GitHub repo of validated pipelines. `crew install name@crew-plugins-official`.
-Pipeline-as-directory format = marketplace entry format. No migration.
+GitHub repo of validated plugins. `crew install name@crew-plugins-official`
+fetches and installs. Plugin-as-directory format = marketplace entry
+format (see Phase 2). No migration.
 
 ### Phase 6 — SSO / Enterprise Auth (Month 4+)
 Only after team adoption proven.

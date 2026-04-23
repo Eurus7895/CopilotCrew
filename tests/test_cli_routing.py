@@ -10,7 +10,14 @@ import pathlib
 
 import pytest
 
-from crew import agent_registry, cli, intent_router, pipeline_registry, pipeline_runner
+from crew import (
+    agent_registry,
+    cli,
+    intent_router,
+    pipeline_registry,
+    pipeline_runner,
+    skill_registry,
+)
 from crew.intent_router import RouteResult
 
 
@@ -132,6 +139,38 @@ def spies(monkeypatch):
 
     monkeypatch.setattr(agent_registry, "load_agent", _load_agent)
 
+    monkeypatch.setattr(
+        skill_registry,
+        "discover",
+        lambda *a, **k: [
+            skill_registry.SkillInfo(
+                name="debug",
+                description="debug skill",
+                version="0.1.0",
+                path=pathlib.Path("/tmp/skills/debug"),
+            )
+        ],
+    )
+
+    def _load_skill(name, **kw):
+        if name == "debug":
+            return skill_registry.SkillConfig(
+                name="debug",
+                description="debug skill",
+                version="0.1.0",
+                instructions="be-systematic-about-debugging",
+                allowed_tools=["read", "shell"],
+                frontmatter={},
+                path=pathlib.Path("/tmp/skills/debug/SKILL.md"),
+                dir=pathlib.Path("/tmp/skills/debug"),
+                references_dir=None,
+                scripts_dir=None,
+                raw={},
+            )
+        raise skill_registry.SkillNotFound(name)
+
+    monkeypatch.setattr(skill_registry, "load_skill", _load_skill)
+
     return dict(
         direct=direct_spy,
         runner=runner_spy,
@@ -223,68 +262,61 @@ def test_mode_flags_are_mutually_exclusive():
         cli.main(["--pipeline", "--agent", "coder", "x"])
 
 
-# ── Slash command dispatch ───────────────────────────────────────────────────
+# ── Slash command dispatch (skills) ──────────────────────────────────────────
 
 
-def test_slash_pipeline_bypasses_router(spies):
-    rc = cli.main(["/daily-standup", "prep"])
+def test_slash_skill_invokes_direct_with_skill_prompt(spies):
+    rc = cli.main(["/debug", "why", "is", "my", "test", "failing"])
     assert rc == 0
     # Router is never invoked — zero LLM cost.
-    assert spies["router"].called_with == []
-    assert spies["direct"].called_with == []
-    assert len(spies["runner"].called_with) == 1
-    (args, kwargs) = spies["runner"].called_with[0]
-    # Pipeline config is the first positional; "prep" is the user input,
-    # slash-stripped.
-    assert args[0].name == "daily-standup"
-    assert args[1] == "prep"
-    assert kwargs["route_result"]["mode"] == "slash"
-    assert kwargs["route_result"]["pipeline"] == "daily-standup"
-
-
-def test_slash_pipeline_with_no_args_sends_empty_prompt(spies):
-    rc = cli.main(["/daily-standup"])
-    assert rc == 0
-    assert spies["router"].called_with == []
-    assert len(spies["runner"].called_with) == 1
-    (args, _kwargs) = spies["runner"].called_with[0]
-    assert args[1] == ""
-
-
-def test_slash_agent_bypasses_router(spies):
-    rc = cli.main(["/coder", "refactor", "this"])
-    assert rc == 0
     assert spies["router"].called_with == []
     assert spies["runner"].called_with == []
     assert len(spies["direct"].called_with) == 1
     (args, kwargs) = spies["direct"].called_with[0]
-    assert args == ("refactor this",)
-    assert kwargs["agent_prompt"] == "persona-prompt"
+    # The skill's name is stripped; the rest is the user input.
+    assert args == ("why is my test failing",)
+    assert kwargs["skill_prompt"] == "be-systematic-about-debugging"
+    # No agent persona is applied by a bare slash command.
+    assert kwargs.get("agent_prompt") is None
 
 
-def test_slash_unknown_command_exits_nonzero(spies, capsys):
+def test_slash_skill_with_no_args_sends_empty_prompt(spies):
+    rc = cli.main(["/debug"])
+    assert rc == 0
+    assert len(spies["direct"].called_with) == 1
+    (args, kwargs) = spies["direct"].called_with[0]
+    assert args == ("",)
+    assert kwargs["skill_prompt"] == "be-systematic-about-debugging"
+
+
+def test_slash_unknown_skill_exits_nonzero(spies, capsys):
     with pytest.raises(SystemExit) as exc:
         cli.main(["/nope", "something"])
     assert exc.value.code == 2
     err = capsys.readouterr().err
-    assert "unknown command: /nope" in err
-    assert "/daily-standup" in err
-    assert "/coder" in err
+    assert "unknown skill: /nope" in err
+    assert "/debug" in err
 
 
-def test_slash_subagent_only_rejected(spies, capsys):
-    with pytest.raises(SystemExit) as exc:
-        cli.main(["/internal-only", "x"])
-    assert exc.value.code == 2
-    err = capsys.readouterr().err
-    assert "subagent-only" in err
+def test_slash_does_not_dispatch_to_pipeline_or_agent(spies, capsys):
+    # Even though `daily-standup` and `coder` exist, they are NOT
+    # addressable via slash — slash is skill-only.
+    with pytest.raises(SystemExit):
+        cli.main(["/daily-standup", "prep"])
+    assert spies["runner"].called_with == []
+
+    capsys.readouterr()  # drain
+
+    with pytest.raises(SystemExit):
+        cli.main(["/coder", "fix"])
+    assert spies["direct"].called_with == []
 
 
 def test_direct_flag_sends_slash_prompt_verbatim(spies):
-    # `--direct "/standup"` should NOT parse the slash — explicit override wins.
-    rc = cli.main(["--direct", "/daily-standup"])
+    # `--direct "/debug"` should NOT parse the slash — explicit override wins.
+    rc = cli.main(["--direct", "/debug"])
     assert rc == 0
-    assert spies["direct"].called_with == [(("/daily-standup",), {"model": None})]
+    assert spies["direct"].called_with == [(("/debug",), {"model": None})]
     assert spies["runner"].called_with == []
     assert spies["router"].called_with == []
 
@@ -293,7 +325,7 @@ def test_pipeline_flag_with_slash_still_uses_router(spies):
     spies["router_stub"].verdict = RouteResult(
         mode="pipeline", pipeline="daily-standup", reason="forced"
     )
-    rc = cli.main(["--pipeline", "/daily-standup"])
+    rc = cli.main(["--pipeline", "/debug"])
     assert rc == 0
     # Router IS called because --pipeline was passed; slash is ignored.
     assert len(spies["router"].called_with) == 1
