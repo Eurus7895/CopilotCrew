@@ -1,0 +1,13 @@
+name: release-notes
+description: >
+  Compose release notes from PRs merged since the last tag. Groups by
+  "Features / Fixes / Internal", credits authors, and highlights any
+  breaking changes.
+level: 0
+agent: agents/generator.md
+mcp:
+  - github
+allowed_tools:
+  - read
+  - mcp
+output_subdir: release-notes

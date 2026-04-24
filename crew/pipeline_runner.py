@@ -37,6 +37,7 @@ from copilot.session import PermissionHandler
 from crew import evaluator as _evaluator
 from crew import hooks
 from crew.pipeline_registry import PipelineConfig
+from crew.streamer import Streamer, TerminalStreamer
 
 _log = logging.getLogger("crew.pipeline_runner")
 
@@ -101,6 +102,7 @@ async def _run_generator(
     session_id: str,
     model: str | None,
     fix_instructions: list[str] | None = None,
+    streamer: Streamer | None = None,
 ) -> tuple[str, str, str]:
     """Run one generator turn. Returns (output_text, started_at, finished_at).
 
@@ -109,34 +111,18 @@ async def _run_generator(
     the next attempt sees the evaluator's feedback. The system message is
     always ``config.agent_prompt`` — the generator restarts with a fresh
     session per attempt (no carry-over context).
-    """
-    buffer: list[str] = []
 
-    def on_event(event: SessionEvent) -> None:
-        etype = event.type
-        if etype == SessionEventType.ASSISTANT_MESSAGE_DELTA:
-            delta = getattr(event.data, "delta_content", None)
-            if delta:
-                sys.stdout.write(delta)
-                sys.stdout.flush()
-                buffer.append(delta)
-            return
-        if _TOOL_USE_START is not None and etype == _TOOL_USE_START:
-            hooks.fire(
-                "pre-tool-use",
-                session_id=session_id,
-                pipeline=config.name,
-                event=event,
-            )
-            return
-        if _TOOL_USE_END is not None and etype == _TOOL_USE_END:
-            hooks.fire(
-                "post-tool-use",
-                session_id=session_id,
-                pipeline=config.name,
-                event=event,
-            )
-            return
+    ``streamer`` chooses where deltas go. Default :class:`TerminalStreamer`
+    prints to stdout (legacy behaviour). The GUI passes a
+    :class:`CallbackStreamer` that fans deltas onto the SSE bus.
+    """
+    # pre-/post-tool-use hooks fire through the streamer so every caller
+    # gets them — not just the default terminal path.
+    hook_streamer = _HookFiringStreamer(
+        inner=streamer or TerminalStreamer(),
+        session_id=session_id,
+        pipeline_name=config.name,
+    )
 
     if _TOOL_USE_START is None or _TOOL_USE_END is None:
         _tool_use_warn_once()
@@ -156,14 +142,54 @@ async def _run_generator(
     }
     async with CopilotClient() as client:
         async with await client.create_session(**session_kwargs) as session:
-            session.on(on_event)
+            session.on(hook_streamer.handle_event)
             await session.send_and_wait(prompt)
-    sys.stdout.write("\n")
-    sys.stdout.flush()
+    hook_streamer.finish_line()
     finished_at = _now_iso()
 
-    output_text = "".join(buffer).strip() + "\n"
+    output_text = hook_streamer.text.strip() + "\n"
     return output_text, started_at, finished_at
+
+
+class _HookFiringStreamer(Streamer):
+    """Wraps another streamer; forwards deltas + fires pre/post-tool hooks.
+
+    We inherit from ``Streamer`` instead of subclassing a concrete type so
+    any caller-supplied streamer (Terminal, Callback, …) can be composed.
+    """
+
+    def __init__(self, *, inner: Streamer, session_id: str, pipeline_name: str) -> None:
+        super().__init__()
+        self._inner = inner
+        self._session_id = session_id
+        self._pipeline_name = pipeline_name
+
+    def handle_event(self, event: SessionEvent) -> None:
+        # Delegate to inner (which updates its own buffer and its on_delta),
+        # then additionally dispatch tool-use events to the hook registry.
+        self._inner.handle_event(event)
+        etype = event.type
+        if _TOOL_USE_START is not None and etype == _TOOL_USE_START:
+            hooks.fire(
+                "pre-tool-use",
+                session_id=self._session_id,
+                pipeline=self._pipeline_name,
+                event=event,
+            )
+        elif _TOOL_USE_END is not None and etype == _TOOL_USE_END:
+            hooks.fire(
+                "post-tool-use",
+                session_id=self._session_id,
+                pipeline=self._pipeline_name,
+                event=event,
+            )
+
+    @property
+    def text(self) -> str:
+        return self._inner.text
+
+    def finish_line(self) -> None:
+        self._inner.finish_line()
 
 
 async def run_level_0(
@@ -174,6 +200,7 @@ async def run_level_0(
     model: str | None = None,
     crew_home: Path | None = None,
     route_result: dict[str, Any] | None = None,
+    streamer: Streamer | None = None,
 ) -> RunResult:
     if config.level != 0:
         raise ValueError(
@@ -201,7 +228,7 @@ async def run_level_0(
     )
 
     output_text, started_at, finished_at = await _run_generator(
-        config, user_input, session_id=session_id, model=model
+        config, user_input, session_id=session_id, model=model, streamer=streamer
     )
     output_path.write_text(output_text, encoding="utf-8")
 
@@ -241,6 +268,7 @@ async def run_level_1(
     crew_home: Path | None = None,
     route_result: dict[str, Any] | None = None,
     max_retries: int = 3,
+    streamer: Streamer | None = None,
 ) -> RunResult:
     if config.level != 1:
         raise ValueError(
@@ -288,6 +316,7 @@ async def run_level_1(
             session_id=session_id,
             model=model,
             fix_instructions=last_fix_instructions,
+            streamer=streamer,
         )
         attempt_output_path = (
             outputs_dir / f"{run_stamp}-{run_uid}-attempt{attempt}.md"
@@ -384,6 +413,7 @@ async def run_pipeline(
     crew_home: Path | None = None,
     route_result: dict[str, Any] | None = None,
     max_retries: int = 3,
+    streamer: Streamer | None = None,
 ) -> RunResult:
     """Dispatch by ``config.level``.
 
@@ -398,6 +428,7 @@ async def run_pipeline(
             model=model,
             crew_home=crew_home,
             route_result=route_result,
+            streamer=streamer,
         )
     if config.level == 1:
         return await run_level_1(
@@ -408,6 +439,7 @@ async def run_pipeline(
             crew_home=crew_home,
             route_result=route_result,
             max_retries=max_retries,
+            streamer=streamer,
         )
     raise ValueError(
         f"Level {config.level} not supported in v1 (Level 2 is gated on "

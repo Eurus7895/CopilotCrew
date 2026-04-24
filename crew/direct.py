@@ -28,13 +28,13 @@ artifacts must survive context resets).
 
 from __future__ import annotations
 
-import sys
 from dataclasses import dataclass
 from typing import Any
 
 from copilot import CopilotClient
-from copilot.generated.session_events import SessionEvent, SessionEventType
 from copilot.session import PermissionHandler
+
+from crew.streamer import Streamer, TerminalStreamer
 
 DIRECT_SYSTEM_PROMPT = "You are a helpful team assistant."
 
@@ -87,23 +87,21 @@ async def run_direct(
     skill_prompt: str | None = None,
     history_prompt: str | None = None,
     session_id: str | None = None,
+    streamer: Streamer | None = None,
 ) -> DirectResult:
-    """Send `user_input` and stream the reply to stdout.
+    """Send `user_input` and stream the reply through ``streamer``.
+
+    Default streamer :class:`crew.streamer.TerminalStreamer` prints
+    deltas to stdout (legacy CLI behaviour). The GUI's ``/chat`` route
+    passes a :class:`crew.streamer.CallbackStreamer` that publishes each
+    delta onto the SSE bus instead.
 
     Returns a ``DirectResult(session_id, assistant_text)`` so the caller
     can persist the conversation. ``session_id`` (in) resumes an existing
     Copilot session; ``DirectResult.session_id`` (out) is what to remember
     for the next turn (it may differ if the SDK assigned a new id).
     """
-    buffer: list[str] = []
-
-    def on_event(event: SessionEvent) -> None:
-        if event.type == SessionEventType.ASSISTANT_MESSAGE_DELTA:
-            delta = getattr(event.data, "delta_content", None)
-            if delta:
-                sys.stdout.write(delta)
-                sys.stdout.flush()
-                buffer.append(delta)
+    s: Streamer = streamer if streamer is not None else TerminalStreamer()
 
     session_kwargs: dict[str, Any] = {
         "on_permission_request": PermissionHandler.approve_all,
@@ -119,13 +117,12 @@ async def run_direct(
 
     async with CopilotClient() as client:
         async with await client.create_session(**session_kwargs) as session:
-            session.on(on_event)
+            session.on(s.handle_event)
             await session.send_and_wait(user_input)
-            sys.stdout.write("\n")
-            sys.stdout.flush()
+            s.finish_line()
             resolved_session_id = getattr(session, "session_id", None) or session_id or ""
 
     return DirectResult(
         session_id=resolved_session_id,
-        assistant_text="".join(buffer).strip(),
+        assistant_text=s.text.strip(),
     )
