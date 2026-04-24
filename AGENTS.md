@@ -29,11 +29,19 @@ the Copilot SDK. Read `CLAUDE.md` for the full design doc.
   invoked by slash commands and appended to the session's system message
 - `crew/pipeline_runner.py` — Level 0 + Level 1 execution; `run_pipeline`
   dispatches by `config.level`. Fires lifecycle hooks (including
-  `on-eval-fail` / `on-escalate` for Level 1)
+  `on-eval-fail` / `on-escalate` for Level 1). Accepts `stream_mode`
+  (`verbose` / `summary`) — `crew --pipeline --summary "…"` swaps
+  token-by-token streaming for terse status lines
 - `crew/evaluator.py` — isolated evaluator session for Level 1 pipelines.
   Fresh `CopilotClient`, no MCP, no tools — receives only the generator
   output text + the pipeline's schema/criteria. Returns a strict JSON
   verdict (`status`, `issues`, `summary`) parsed defensively
+- `crew/streamer.py` — single `on_event` handler for every Copilot
+  session in Crew. Three modes: `verbose` (stream to stdout),
+  `summary` (terse status lines), `silent` (capture-only, used by the
+  evaluator + router). Tool-execution events fan out to optional
+  callbacks so the pipeline runner keeps firing `pre-tool-use` /
+  `post-tool-use` hooks without re-implementing the dispatch
 - `crew/hooks.py` — in-process hook registry (`session-start`,
   `pre-tool-use`, `post-tool-use`, `on-eval-fail`, `on-escalate`, `post-run`)
 - `crew/sdk/` — thin wrappers over the Copilot SDK
@@ -91,6 +99,14 @@ See CLAUDE.md "Agent Complexity Model" and "Phase 5 — Plugin Marketplace".
 
 ## Build status
 
+**Day 4-B streamer shipped.** `crew/streamer.py` consolidates the
+previously-duplicated `on_event` handler into one `Streamer` class with
+three modes (`verbose` / `summary` / `silent`). `crew --pipeline
+--summary "…"` replaces token-by-token streaming with terse status
+lines (generator start, per-tool call, final char count) for cron / CI /
+log-file invocations — the pipeline's output file is identical either
+way.
+
 **Day 4-A shipped.** Bounded session continuity for chatty modes:
 `crew/conversations.py` persists the per-scope Copilot `session_id` in
 `~/.crew/sessions.json` and appends every turn to a rotation-input log;
@@ -105,6 +121,6 @@ Earlier days, in order: Day 2 (pipeline runner + hooks +
 `daily-standup`), Day 2.5 (3-way router + `agents/` directory), Day 2.8
 (slash commands invoke skills; `skills/debug/`), Day 3 (Level 1 pipelines
 with isolated evaluator + correction loop; `incident-triage`), `/help`
-(zero-LLM registry listing). Day 4-B+ will add the streamer + remaining
-pipelines (ticket-refinement, code-review-routing, release-notes) and
-subagent spawning.
+(zero-LLM registry listing). Remaining Day 4-B work: ticket-refinement,
+code-review-routing, and release-notes pipelines, plus subagent
+spawning.

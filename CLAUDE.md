@@ -647,10 +647,27 @@ Implementation notes:
 
 ### Day 4-B — Streaming + remaining pipelines
 ```
-[ ] streamer.py: terminal output + summary mode
+[x] streamer.py: terminal output + summary mode
 [ ] ticket-refinement, code-review-routing, release-notes
 [ ] Test all 5 pipelines end-to-end on real team data
 ```
+
+Implementation notes:
+
+* `crew/streamer.py` consolidates the `on_event` handler that every
+  Copilot session used to re-implement (direct mode, pipeline runner,
+  evaluator, intent router). One `Streamer` class with three modes:
+  `verbose` (stream tokens to stdout — direct / agent / slash),
+  `summary` (terse status lines: generating / tool / done N chars —
+  pipelines under `--summary`), `silent` (capture-only — evaluator
+  + router). Tool-execution events fan out to optional
+  `on_tool_start` / `on_tool_end` callbacks so the pipeline runner
+  can keep firing `pre-tool-use` / `post-tool-use` hooks without
+  re-implementing the event-type dispatch.
+* `crew --pipeline --summary "…"` is the user-facing flag. The
+  generated output file is identical in both modes — `--summary` only
+  changes what lands on the terminal, so cron / CI invocations can
+  keep logs readable without giving up the audit trail.
 
 ### Day 5 — Hardening + first team member
 ```
@@ -767,6 +784,6 @@ architecture primitives, different execution model.
 
 *Updated: April 2026*
 *Product: Crew*
-*Phase: Day 4-A shipped; Day 4-B next*
+*Phase: Day 4-B streamer shipped; remaining pipelines next*
 *First user: Current team*
-*Next: Day 4-B — streamer + remaining pipelines (ticket-refinement, code-review-routing, release-notes)*
+*Next: Day 4-B — ticket-refinement, code-review-routing, release-notes pipelines*

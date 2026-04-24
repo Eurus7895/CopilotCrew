@@ -13,6 +13,12 @@ the intent router (zero LLM cost).
 ``CREW_TURN_CAP`` turns (default 20). ``--new`` forces a fresh start.
 Pipelines and the evaluator are always one-shot — never resume, never
 log (CLAUDE.md principle #2).
+
+**Output.** Direct + agent + slash modes always stream tokens to stdout.
+Pipelines stream by default and accept ``--summary`` for terse status
+lines (one line per attempt + per tool call + a final char count) —
+useful for cron / CI / log-file invocations where token-level streaming
+is just noise. The generated output file is identical in either mode.
 """
 
 from __future__ import annotations
@@ -61,6 +67,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--new",
         action="store_true",
         help="Force a fresh Copilot session for this scope (drops cached session_id).",
+    )
+    parser.add_argument(
+        "--summary",
+        action="store_true",
+        help=(
+            "Pipeline mode only: print terse status lines instead of streaming "
+            "every token. The generated output still lands in the pipeline's "
+            "output file as usual."
+        ),
     )
     return parser
 
@@ -253,11 +268,12 @@ def _print_help() -> None:
     out.write("\n")
 
     out.write("Other modes:\n")
-    out.write("  crew \"<prompt>\"          → router picks direct / agent / pipeline\n")
-    out.write("  crew --direct \"<prompt>\" → force direct mode (single LLM call)\n")
-    out.write("  crew --pipeline \"<x>\"    → force pipeline mode\n")
-    out.write("  crew --new \"<x>\"         → fresh session (drop cached memory)\n")
-    out.write("  /help                    → this listing (zero LLM cost)\n")
+    out.write("  crew \"<prompt>\"           → router picks direct / agent / pipeline\n")
+    out.write("  crew --direct \"<prompt>\"  → force direct mode (single LLM call)\n")
+    out.write("  crew --pipeline \"<x>\"     → force pipeline mode\n")
+    out.write("  crew --pipeline --summary → terse status lines, no token streaming\n")
+    out.write("  crew --new \"<x>\"          → fresh session (drop cached memory)\n")
+    out.write("  /help                     → this listing (zero LLM cost)\n")
     out.flush()
 
 
@@ -272,6 +288,7 @@ async def _dispatch(
     pipeline: bool,
     model: str | None,
     new: bool,
+    summary: bool,
 ) -> None:
     if direct:
         await _run_direct_with_memory(
@@ -358,7 +375,12 @@ async def _dispatch(
     # passthrough, no conversations bookkeeping. The pipeline's own plan
     # JSON under ~/.crew/plans/ is the audit trail for governed workflows.
     await pipeline_runner.run_pipeline(
-        config, prompt, verdict.params, model=model, route_result=route_dump
+        config,
+        prompt,
+        verdict.params,
+        model=model,
+        route_result=route_dump,
+        stream_mode="summary" if summary else "verbose",
     )
 
 
@@ -374,6 +396,7 @@ def main(argv: list[str] | None = None) -> int:
                 pipeline=args.pipeline,
                 model=args.model,
                 new=args.new,
+                summary=args.summary,
             )
         )
     except KeyboardInterrupt:

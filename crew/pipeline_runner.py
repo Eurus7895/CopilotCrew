@@ -23,7 +23,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import sys
 import uuid
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -31,12 +30,13 @@ from pathlib import Path
 from typing import Any
 
 from copilot import CopilotClient
-from copilot.generated.session_events import SessionEvent, SessionEventType
+from copilot.generated.session_events import SessionEvent
 from copilot.session import PermissionHandler
 
 from crew import evaluator as _evaluator
 from crew import hooks
 from crew.pipeline_registry import PipelineConfig
+from crew.streamer import StreamMode, Streamer
 
 _log = logging.getLogger("crew.pipeline_runner")
 
@@ -46,11 +46,6 @@ class RunResult:
     session_id: str
     output_path: Path
     plan_path: Path
-
-
-_TOOL_USE_START = getattr(SessionEventType, "TOOL_EXECUTION_START", None)
-_TOOL_USE_END = getattr(SessionEventType, "TOOL_EXECUTION_COMPLETE", None)
-_TOOL_USE_WARNED = False
 
 
 def _resolve_crew_home(crew_home: Path | None) -> Path:
@@ -74,18 +69,6 @@ def _build_session_id(pipeline_name: str) -> str:
     return f"{pipeline_name}-{_iso_timestamp()}-{uuid.uuid4().hex[:6]}"
 
 
-def _tool_use_warn_once() -> None:
-    global _TOOL_USE_WARNED
-    if _TOOL_USE_WARNED:
-        return
-    _TOOL_USE_WARNED = True
-    _log.info(
-        "installed copilot SDK does not expose TOOL_EXECUTION_{START,COMPLETE}; "
-        "pre-tool-use/post-tool-use hooks will not fire until the SDK "
-        "surfaces those events."
-    )
-
-
 def _verdict_to_dict(verdict: _evaluator.EvaluatorVerdict) -> dict[str, Any]:
     return {
         "status": verdict.status,
@@ -100,6 +83,8 @@ async def _run_generator(
     *,
     session_id: str,
     model: str | None,
+    stream_mode: StreamMode,
+    streamer_label: str = "",
     fix_instructions: list[str] | None = None,
 ) -> tuple[str, str, str]:
     """Run one generator turn. Returns (output_text, started_at, finished_at).
@@ -110,36 +95,29 @@ async def _run_generator(
     always ``config.agent_prompt`` — the generator restarts with a fresh
     session per attempt (no carry-over context).
     """
-    buffer: list[str] = []
 
-    def on_event(event: SessionEvent) -> None:
-        etype = event.type
-        if etype == SessionEventType.ASSISTANT_MESSAGE_DELTA:
-            delta = getattr(event.data, "delta_content", None)
-            if delta:
-                sys.stdout.write(delta)
-                sys.stdout.flush()
-                buffer.append(delta)
-            return
-        if _TOOL_USE_START is not None and etype == _TOOL_USE_START:
-            hooks.fire(
-                "pre-tool-use",
-                session_id=session_id,
-                pipeline=config.name,
-                event=event,
-            )
-            return
-        if _TOOL_USE_END is not None and etype == _TOOL_USE_END:
-            hooks.fire(
-                "post-tool-use",
-                session_id=session_id,
-                pipeline=config.name,
-                event=event,
-            )
-            return
+    def _on_tool_start(event: SessionEvent) -> None:
+        hooks.fire(
+            "pre-tool-use",
+            session_id=session_id,
+            pipeline=config.name,
+            event=event,
+        )
 
-    if _TOOL_USE_START is None or _TOOL_USE_END is None:
-        _tool_use_warn_once()
+    def _on_tool_end(event: SessionEvent) -> None:
+        hooks.fire(
+            "post-tool-use",
+            session_id=session_id,
+            pipeline=config.name,
+            event=event,
+        )
+
+    streamer = Streamer(
+        mode=stream_mode,
+        label=streamer_label,
+        on_tool_start=_on_tool_start,
+        on_tool_end=_on_tool_end,
+    )
 
     prompt = user_input
     if fix_instructions:
@@ -156,13 +134,11 @@ async def _run_generator(
     }
     async with CopilotClient() as client:
         async with await client.create_session(**session_kwargs) as session:
-            session.on(on_event)
+            session.on(streamer.handler)
             await session.send_and_wait(prompt)
-    sys.stdout.write("\n")
-    sys.stdout.flush()
     finished_at = _now_iso()
 
-    output_text = "".join(buffer).strip() + "\n"
+    output_text = streamer.finish().strip() + "\n"
     return output_text, started_at, finished_at
 
 
@@ -174,6 +150,7 @@ async def run_level_0(
     model: str | None = None,
     crew_home: Path | None = None,
     route_result: dict[str, Any] | None = None,
+    stream_mode: StreamMode = "verbose",
 ) -> RunResult:
     if config.level != 0:
         raise ValueError(
@@ -201,7 +178,12 @@ async def run_level_0(
     )
 
     output_text, started_at, finished_at = await _run_generator(
-        config, user_input, session_id=session_id, model=model
+        config,
+        user_input,
+        session_id=session_id,
+        model=model,
+        stream_mode=stream_mode,
+        streamer_label=config.name if stream_mode == "summary" else "",
     )
     output_path.write_text(output_text, encoding="utf-8")
 
@@ -241,6 +223,7 @@ async def run_level_1(
     crew_home: Path | None = None,
     route_result: dict[str, Any] | None = None,
     max_retries: int = 3,
+    stream_mode: StreamMode = "verbose",
 ) -> RunResult:
     if config.level != 1:
         raise ValueError(
@@ -282,11 +265,18 @@ async def run_level_1(
     escalated = False
 
     for attempt in range(1, max_retries + 1):
+        label = (
+            f"{config.name} attempt {attempt}/{max_retries}"
+            if stream_mode == "summary"
+            else ""
+        )
         output_text, started_at, finished_at = await _run_generator(
             config,
             user_input,
             session_id=session_id,
             model=model,
+            stream_mode=stream_mode,
+            streamer_label=label,
             fix_instructions=last_fix_instructions,
         )
         attempt_output_path = (
@@ -384,6 +374,7 @@ async def run_pipeline(
     crew_home: Path | None = None,
     route_result: dict[str, Any] | None = None,
     max_retries: int = 3,
+    stream_mode: StreamMode = "verbose",
 ) -> RunResult:
     """Dispatch by ``config.level``.
 
@@ -398,6 +389,7 @@ async def run_pipeline(
             model=model,
             crew_home=crew_home,
             route_result=route_result,
+            stream_mode=stream_mode,
         )
     if config.level == 1:
         return await run_level_1(
@@ -408,6 +400,7 @@ async def run_pipeline(
             crew_home=crew_home,
             route_result=route_result,
             max_retries=max_retries,
+            stream_mode=stream_mode,
         )
     raise ValueError(
         f"Level {config.level} not supported in v1 (Level 2 is gated on "
