@@ -48,8 +48,8 @@ def test_skip_deletes_latest(client, gui_config):
 
 def test_post_to_slack_is_disabled(client):
     html = client.get("/").text
-    # Crude but targeted: the primary button must carry the disabled attr and tooltip.
-    assert 'class="btn btn-primary"' in html
+    # Primary button is the first labelled "Post to #standup" and carries disabled + tooltip.
+    assert "Post to #standup" in html
     assert "disabled" in html
     assert "Slack integration coming" in html
 

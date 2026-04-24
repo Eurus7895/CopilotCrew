@@ -1,0 +1,17 @@
+<article class="warm-moment">
+  <div class="warm-polaroid">
+    <div class="warm-polaroid-avatar" aria-hidden="true">C</div>
+    <div class="warm-polaroid-caption">Crew &middot; {{ (selected_event.time if selected_event else "8:47 AM") }}</div>
+  </div>
+  <header class="warm-moment-head">
+    <span class="warm-hat">today's hat &middot; chief of staff</span>
+    <h2 class="warm-moment-title">Good morning, {{ cfg.user_name }}</h2>
+    <p class="warm-moment-lead">Here's what happened overnight.</p>
+  </header>
+
+  {% include "themes/warm/card_prs.html" %}
+  {% include "themes/warm/card_mentions.html" %}
+  {% include "themes/warm/card_standup.html" %}
+  {% include "themes/warm/action_row.html" %}
+  {% include "themes/warm/chat_input.html" %}
+</article>

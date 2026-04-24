@@ -1,0 +1,15 @@
+<div class="term-actions">
+  <button type="button" class="term-key" disabled title="Slack integration coming in Phase 8">
+    <span class="term-kbd">&crarr;</span> Post to #standup
+  </button>
+  <button type="button" class="term-key" hx-post="/standup/edit" hx-swap="none">
+    <span class="term-kbd">e</span> Edit draft
+  </button>
+  <button type="button" class="term-key" hx-post="/standup/skip"
+          hx-target="#card-standup" hx-swap="outerHTML">
+    <span class="term-kbd">s</span> Skip today
+  </button>
+  <button type="button" class="term-key term-key-ghost" hx-post="/standup/run" hx-swap="none">
+    <span class="term-kbd">r</span> Regenerate
+  </button>
+</div>

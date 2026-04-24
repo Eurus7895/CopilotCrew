@@ -13,12 +13,24 @@ def test_timeline_event_returns_full_page_without_hx(client):
 def test_timeline_event_returns_fragment_with_hx_request(client):
     r = client.get("/timeline/nudge", headers={"HX-Request": "true"})
     assert r.status_code == 200
-    # Fragment must not include the outer chrome.
+    # Fragment must not include the outer chrome (page head, window, theme tabs).
     assert "page-head" not in r.text
-    assert "window-chrome" not in r.text
-    # But it must include a center moment article and an oob-swapped right rail.
-    assert "moment-title" in r.text
-    assert 'hx-swap-oob' in r.text
+    assert "theme-tabs" not in r.text
+    assert "warm-window" not in r.text
+    # But it must include the theme's center timeline article.
+    assert "warm-moment" in r.text
+
+
+def test_timeline_event_respects_theme_cookie_for_fragment(client):
+    r = client.get(
+        "/timeline/nudge",
+        headers={"HX-Request": "true"},
+        cookies={"crew_theme": "modernist"},
+    )
+    assert r.status_code == 200
+    # Modernist uses the §NN section marker + mod-entry article.
+    assert "mod-entry" in r.text
+    assert "warm-moment" not in r.text
 
 
 def test_unknown_timeline_event_returns_404(client):

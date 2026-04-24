@@ -1,0 +1,22 @@
+<article class="mod-entry">
+  <div class="mod-entry-head">
+    <span class="mod-kicker">Filed as &middot; Chief of Staff</span>
+    <span class="mod-kicker mod-kicker-right">Entry &#8470; 01</span>
+  </div>
+
+  <div class="mod-numeral-row">
+    <div class="mod-numeral">01<span class="mod-numeral-slash">/</span>0{{ timeline|length or 5 }}</div>
+    <div class="mod-numeral-meta">
+      <div class="mod-numeral-time">{{ (selected_event.time if selected_event else "8:47 AM") }}</div>
+      <div class="mod-numeral-kind">{{ (selected_event.label if selected_event else "MORNING") | upper }}</div>
+    </div>
+  </div>
+
+  <h2 class="mod-greeting">Good morning, {{ cfg.user_name }}<span class="mod-accent">.</span></h2>
+  <p class="mod-lead"><span class="mod-lead-bar" aria-hidden="true"></span>Here's what happened overnight.</p>
+
+  {% include "themes/modernist/card_prs.html" %}
+  {% include "themes/modernist/card_mentions.html" %}
+  {% include "themes/modernist/card_standup.html" %}
+  {% include "themes/modernist/action_row.html" %}
+</article>

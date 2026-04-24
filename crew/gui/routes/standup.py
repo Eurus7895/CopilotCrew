@@ -1,4 +1,4 @@
-"""Standup draft card + regenerate/edit/skip actions."""
+"""Standup draft card + regenerate/edit/skip actions (theme-aware)."""
 
 from __future__ import annotations
 
@@ -7,19 +7,24 @@ import asyncio
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response
 
-from crew.gui.routes._shared import get_config, get_templates
+from crew.gui.routes._shared import get_config, get_templates, resolve_theme
 from crew.gui.services import editor, standup_service
 
 router = APIRouter(prefix="/standup")
+
+
+def _card_template(theme: str) -> str:
+    return f"themes/{theme}/card_standup.html"
 
 
 @router.get("/draft", response_class=HTMLResponse)
 async def draft(request: Request) -> HTMLResponse:
     cfg = get_config(request)
     templates = get_templates(request)
+    theme = resolve_theme(request)
     draft = standup_service.latest_draft(cfg)
     return templates.TemplateResponse(
-        request, "partials/card_standup.html", {"draft": draft}
+        request, _card_template(theme), {"draft": draft, "theme": theme}
     )
 
 
@@ -46,8 +51,9 @@ async def edit(request: Request) -> Response:
 async def skip(request: Request) -> HTMLResponse:
     cfg = get_config(request)
     templates = get_templates(request)
+    theme = resolve_theme(request)
     standup_service.delete_latest(cfg)
     draft = standup_service.latest_draft(cfg)
     return templates.TemplateResponse(
-        request, "partials/card_standup.html", {"draft": draft}
+        request, _card_template(theme), {"draft": draft, "theme": theme}
     )

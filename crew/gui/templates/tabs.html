@@ -1,0 +1,13 @@
+<nav class="theme-tabs" aria-label="Design language">
+  {% for t in themes %}
+    <a
+      class="tab {% if t == theme %}selected{% endif %}"
+      href="/?theme={{ t }}"
+      data-theme="{{ t }}"
+    >
+      <span class="tab-glyph" aria-hidden="true">◉</span>
+      <span class="tab-label">{{ theme_meta[t].tab_label }}</span>
+    </a>
+  {% endfor %}
+  <span class="tab-size" aria-hidden="true">1340 × 880</span>
+</nav>

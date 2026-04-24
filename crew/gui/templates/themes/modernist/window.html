@@ -1,0 +1,40 @@
+<section class="mod-window" id="window">
+  <header class="mod-masthead">
+    <div class="mod-masthead-left">
+      <span class="mod-mark" aria-hidden="true"></span>
+      <span class="mod-brand">Crew</span>
+      <span class="mod-issue">&ndash; &#8470; 01 / 0{{ timeline|length or 5 }} &middot; APR 24</span>
+    </div>
+    <nav class="mod-nav" aria-label="Sections">
+      <a class="mod-nav-item mod-nav-selected">Today</a>
+      <a class="mod-nav-item">Archive</a>
+      <a class="mod-nav-item">Memory</a>
+      <a class="mod-nav-item">Agents</a>
+      <a class="mod-nav-item">Settings</a>
+    </nav>
+    <div class="mod-masthead-right">
+      <div class="mod-user">{{ cfg.user_name | upper }} &middot; DEV</div>
+      <div class="mod-time">{{ (selected_event.time if selected_event else "8:47 AM") }}</div>
+    </div>
+  </header>
+
+  <div class="mod-body">
+    {% include "themes/modernist/left_rail.html" %}
+    <section class="mod-center" id="center" aria-label="Current moment">
+      {% include "themes/modernist/center_home.html" %}
+    </section>
+    {% include "themes/modernist/right_rail.html" %}
+  </div>
+
+  <footer class="mod-footer">
+    <span>&bull; {{ "ONLINE" if status.online else "OFFLINE" }}</span>
+    <span>|</span>
+    <span>MODE &middot; CHIEF OF STAFF</span>
+    <span>|</span>
+    <span>MODEL &middot; {{ status.model | upper }}</span>
+    <span>|</span>
+    <span>CTX &middot; 12.4K</span>
+    <span class="mod-spacer"></span>
+    <span>CREW &#8470; 01 / 0{{ timeline|length or 5 }}</span>
+  </footer>
+</section>

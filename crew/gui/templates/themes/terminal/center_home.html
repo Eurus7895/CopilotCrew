@@ -1,0 +1,25 @@
+<article class="term-log">
+  <div class="term-log-head">
+    <span class="term-bracket">[{{ (selected_event.time if selected_event else "8:47 AM") }}]</span>
+    <span class="term-tag">CHIEF OF STAFF</span>
+    <span class="term-path-inline">session/morning.log</span>
+  </div>
+
+  <h2 class="term-greeting">Good morning, {{ cfg.user_name }}</h2>
+  <p class="term-quote">&gt; Here's what happened overnight.</p>
+
+  {% include "themes/terminal/card_prs.html" %}
+  {% include "themes/terminal/card_mentions.html" %}
+  {% include "themes/terminal/card_standup.html" %}
+  {% include "themes/terminal/action_row.html" %}
+
+  <form class="term-prompt" onsubmit="return false;">
+    <span class="term-prompt-label">crew&gt;</span>
+    <input
+      type="text"
+      class="term-prompt-input"
+      placeholder="ask about {{ (selected_event.label if selected_event else 'morning') | lower }}"
+      aria-label="crew prompt"
+    >
+  </form>
+</article>

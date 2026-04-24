@@ -5,7 +5,13 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
-from crew.gui.routes._shared import get_config, get_templates, is_htmx
+from crew.gui.routes._shared import (
+    get_config,
+    get_templates,
+    is_htmx,
+    resolve_theme,
+    theme_context,
+)
 from crew.gui.services import mocks, pinned, standup_service, status_service
 
 router = APIRouter(prefix="/timeline")
@@ -15,6 +21,7 @@ router = APIRouter(prefix="/timeline")
 async def timeline_event(request: Request, event_id: str) -> HTMLResponse:
     cfg = get_config(request)
     templates = get_templates(request)
+    theme = resolve_theme(request)
 
     event = mocks.load_timeline_event(cfg, event_id)
     if event is None:
@@ -32,6 +39,10 @@ async def timeline_event(request: Request, event_id: str) -> HTMLResponse:
         "prs": mocks.load_pr_activity(cfg),
         "mentions": mocks.load_slack_mentions(cfg),
         "draft": standup_service.latest_draft(cfg),
+        **theme_context(theme),
     }
-    template = "partials/center_swap.html" if is_htmx(request) else "base.html"
+    if is_htmx(request):
+        template = f"themes/{theme}/center_timeline.html"
+    else:
+        template = "base.html"
     return templates.TemplateResponse(request, template, ctx)

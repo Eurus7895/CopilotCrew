@@ -1,0 +1,47 @@
+<aside class="term-rail term-left">
+  <section class="term-section">
+    <div class="term-path">~/SESSIONS</div>
+    <ul class="term-tree today-list">
+      {% for event in timeline %}
+        <li>
+          <a
+            class="term-session today-row {% if selected_event and selected_event.id == event.id %}selected{% endif %}"
+            href="/timeline/{{ event.id }}"
+            hx-get="/timeline/{{ event.id }}"
+            hx-target="#center"
+            hx-swap="innerHTML"
+            hx-push-url="true"
+            data-event-id="{{ event.id }}"
+          >
+            <span class="term-session-mark">{% if selected_event and selected_event.id == event.id %}&rsaquo;{% else %}&middot;{% endif %}</span>
+            <span class="term-session-time">{{ event.time | lower | replace(" am", "am") | replace(" pm", "pm") }}</span>
+            <span class="term-session-label">{{ event.label | lower }}</span>
+          </a>
+        </li>
+      {% else %}
+        <li class="term-empty">no sessions</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="term-section">
+    <div class="term-path">~/PINNED</div>
+    <ul class="term-tree">
+      {% for item in pinned_items %}
+        <li class="term-pin">
+          <span class="term-session-mark">&minus;</span>
+          <span class="term-pin-label">{% if item.kind == "agent" %}@{{ item.name }}{% else %}{{ item.label }}{% endif %}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="term-section">
+    <div class="term-path">~/AGENTS</div>
+    <ul class="term-tree">
+      <li class="term-agent"><span class="term-agent-dot" aria-hidden="true"></span>coder.idle</li>
+      <li class="term-agent"><span class="term-agent-dot" aria-hidden="true"></span>reviewer.idle</li>
+      <li class="term-agent running"><span class="term-agent-dot" aria-hidden="true"></span>watcher.running</li>
+    </ul>
+  </section>
+</aside>

@@ -1,41 +1,28 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="{{ theme }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Crew — your coworker</title>
+  <title>Crew — {{ theme_meta[theme].tab_label }}</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/themes/_shared.css">
+  <link rel="stylesheet" href="/static/themes/{{ theme }}.css">
   <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
   <script src="/static/app.js" defer></script>
 </head>
-<body>
+<body class="theme-{{ theme }}">
   <main class="page">
     <header class="page-head">
-      <h1>Crew &mdash; your coworker</h1>
+      <h1>Crew &mdash; four directions</h1>
       <p class="tagline">
-        An always-open pane. Warm but professional. Crew greets you,
-        nudges when it matters, watches your tests, preps you for 1:1s,
-        and wraps your day. Click the left rail to scrub through a day.
+        Same coworker, four design languages. Click each tab to swap between them.
+        The data is identical across all four &mdash; the only thing changing is the visual grammar.
       </p>
+      {% include "tabs.html" %}
+      <p class="theme-note">{{ theme_meta[theme].tagline }}</p>
     </header>
 
-    <section class="window" id="window">
-      <div class="window-chrome">
-        <span class="traffic red" aria-hidden="true"></span>
-        <span class="traffic yellow" aria-hidden="true"></span>
-        <span class="traffic green" aria-hidden="true"></span>
-        <div class="window-title">Crew</div>
-      </div>
-
-      <div class="window-body">
-        {% include "partials/left_rail.html" %}
-        <section class="center" id="center" aria-label="Current moment">
-          {% include "partials/center_home.html" %}
-        </section>
-        {% include "partials/right_rail.html" %}
-      </div>
-    </section>
+    {% include "themes/" ~ theme ~ "/window.html" %}
   </main>
 
   <div id="flash" class="flash" aria-live="polite"></div>

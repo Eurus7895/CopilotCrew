@@ -1,0 +1,34 @@
+<aside class="mod-rail mod-left">
+  <div class="mod-kicker-row">
+    <span class="mod-kicker">The index</span>
+    <span class="mod-kicker-right">&#8470; {% if selected_event %}{{ '%02d' | format(loop_index_for(timeline, selected_event.id)) }}{% else %}01{% endif %}</span>
+  </div>
+  <ol class="mod-index today-list">
+    {% for event in timeline %}
+      <li>
+        <a
+          class="mod-index-row today-row {% if selected_event and selected_event.id == event.id %}selected{% endif %}"
+          href="/timeline/{{ event.id }}"
+          hx-get="/timeline/{{ event.id }}"
+          hx-target="#center"
+          hx-swap="innerHTML"
+          hx-push-url="true"
+          data-event-id="{{ event.id }}"
+        >
+          <span class="mod-index-no">{{ '%02d' | format(loop.index) }}</span>
+          <span class="mod-index-time">{{ event.time | replace(" ", "") | upper }}</span>
+          <span class="mod-index-label">{{ event.label }}</span>
+          <span class="mod-index-mark" aria-hidden="true"></span>
+        </a>
+      </li>
+    {% else %}
+      <li class="mod-empty">no entries</li>
+    {% endfor %}
+  </ol>
+
+  <div class="mod-footnote">
+    <div>Set in Archivo</div>
+    <div>&amp; JetBrains Mono</div>
+    <div class="mod-footnote-sub">Stored locally</div>
+  </div>
+</aside>

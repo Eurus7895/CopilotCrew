@@ -1,0 +1,18 @@
+<section class="warm-card">
+  <header class="warm-card-head">
+    <h3>{{ prs|length }} PR{{ "s" if prs|length != 1 else "" }} moved while you slept</h3>
+    <span class="warm-card-tag">digest</span>
+  </header>
+  {% if prs %}
+    <ul class="warm-list">
+      {% for pr in prs %}
+        <li>
+          <code class="warm-ref">{{ pr.repo }}#{{ pr.number }}</code>
+          <span class="warm-list-body">{{ pr.status }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="warm-empty-text">Nothing moved overnight.</p>
+  {% endif %}
+</section>

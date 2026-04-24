@@ -1,0 +1,13 @@
+<section class="term-card">
+  <div class="term-rule">&mdash; 02 &middot; {{ mentions|length }} MENTIONS IN SLACK &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</div>
+  {% if mentions %}
+    {% for m in mentions %}
+      <div class="term-row">
+        <span class="term-ref">[{{ m.channel }}]</span>
+        <span class="term-row-body">{{ m.snippet }}</span>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="term-row term-empty">&gt; no mentions</div>
+  {% endif %}
+</section>
