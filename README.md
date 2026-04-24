@@ -5,25 +5,33 @@ for the full design doc and `AGENTS.md` for session-start orientation.
 
 ## Status
 
-**Day 4-A of the build order, plus the web GUI.** Level 1 pipelines ship
-with an isolated evaluator + correction loop (`pipelines/incident-triage/`);
-direct + agent + slash modes auto-resume their per-(cwd, mode, [agent|skill])
-Copilot session and rotate silently every ~20 turns (`--new` starts fresh).
-A local FastAPI dashboard (`crew gui`) renders a three-pane "always-open
-pane" with pinned commands, a day timeline, the latest standup draft, and
-a remembered-facts panel. Sits on top of Day 3 (evaluator +
-`incident-triage`), Day 2.8 (slash commands invoke skills; `skills/debug/`),
-Day 2.5's 3-way intent router (direct / agent / pipeline), and Day 2's
-pipeline runner + hook registry. Pipelines and the evaluator are always
-one-shot (CLAUDE.md principle #2). Plugin bundles (shareable directories
-of skills) are roadmapped for Phase 2+.
+**Day 4-A of the build order, plus the desktop GUI.** Level 1 pipelines
+ship with an isolated evaluator + correction loop
+(`pipelines/incident-triage/`); direct + agent + slash modes auto-resume
+their per-(cwd, mode, [agent|skill]) Copilot session and rotate silently
+every ~20 turns (`--new` starts fresh). `crew gui` opens a native
+desktop window (PyWebView) showing a three-pane "always-open pane" with
+pinned commands, a day timeline, the latest standup draft, and a
+remembered-facts panel — rendered in any of three design languages
+(Warm · Workspace, Terminal · Operator, Modernist · Swiss) swappable
+from a tab strip. Sits on top of Day 3 (evaluator + `incident-triage`),
+Day 2.8 (slash commands invoke skills; `skills/debug/`), Day 2.5's
+3-way intent router (direct / agent / pipeline), and Day 2's pipeline
+runner + hook registry. Pipelines and the evaluator are always one-shot
+(CLAUDE.md principle #2). Plugin bundles (shareable directories of
+skills) are roadmapped for Phase 2+.
 
 ## Install
 
 ```bash
 pip install -e ".[dev]"          # CLI only
-pip install -e ".[dev,gui]"      # CLI + local web dashboard
+pip install -e ".[dev,gui]"      # CLI + desktop GUI
 ```
+
+The `[gui]` extra pulls in FastAPI, uvicorn, Jinja2, sse-starlette, and
+PyWebView. PyWebView uses the OS's native webview — usually already
+installed. On Linux you may need `sudo apt install libwebkit2gtk-4.1-0`
+(or `libwebkit2gtk-4.0-37` on older distros).
 
 `github-copilot-sdk>=0.2.2` ships platform wheels that bundle the `copilot`
 CLI binary, so pip picks the right wheel for your OS/arch and you get the
@@ -53,7 +61,8 @@ crew --direct "summarise this"       # force direct mode (skips the router)
 crew --agent coder "refactor X"      # force a specific standalone agent
 crew --pipeline "standup prep"       # force pipeline mode (router picks which)
 crew --new "different topic"         # drop cached memory, start fresh
-crew gui [--open] [--port 8765]      # launch the local web dashboard
+crew gui                             # launch the desktop GUI (native window)
+crew gui --no-window --open          # headless mode + system browser
 ```
 
 **Slash commands** (`/<skill>`) invoke a skill from `skills/<name>/SKILL.md`.
@@ -99,35 +108,50 @@ for the summary call. Pipelines and the evaluator **never** resume.
 
 ## GUI
 
-A local web dashboard lives at `crew/gui/` and ships as the optional
-`[gui]` extra (FastAPI + Jinja2 + HTMX + vanilla CSS, no build step).
+`crew gui` opens a native desktop window. Internally a FastAPI +
+Jinja2 + HTMX app runs on an ephemeral localhost port inside the app
+process; the user-visible surface is a PyWebView window pointing at it.
+No browser, no URL to remember, no visible server.
 
 ```bash
 pip install -e ".[gui]"
-crew gui --open                  # http://127.0.0.1:8765, opens a browser
-crew gui --port 9000 --model gpt-4o
+crew gui                        # desktop window, ephemeral port
+crew gui --model gpt-4o         # status-bar model label override
+crew gui --no-window --open     # headless / CI / screencast: run the
+                                # server on 127.0.0.1:8765 and open
+                                # the system browser
 ```
 
-Three panes:
+Three panes, three swappable design languages (tab strip at the top):
 
-- **Left rail** — pinned slash commands / agents / pipelines drawn from the
-  real registries, plus a day timeline (morning, proactive nudge, pair
-  programming, meeting prep, end of day).
-- **Center** — a "Good morning" greeting, cards for overnight PR activity
-  and Slack mentions, the latest daily-standup draft (live from
-  `~/.crew/outputs/daily-standup/`), and an action row. *Post to #standup*
-  is disabled until Slack integration lands; *Regenerate* re-runs the
-  daily-standup pipeline server-side and streams progress over SSE;
-  *Edit draft* opens the output in `$EDITOR`; *Skip today* deletes the
-  latest draft.
-- **Right rail** — "Working on" chips, the timeline mirror, and Recent
-  Facts pulled from `~/.crew/memory.jsonl`.
+- **Warm · Workspace** (default) — warm neutrals, paper cards, polaroid
+  avatar, "A gentle note" panel, chat-style "Tell Crew about…" input.
+- **Terminal · Operator** — tmux-style console, phosphor amber on black,
+  ASCII section rules, vim keybinding hints, `crew>` prompt.
+- **Modernist · Swiss** — Archivo 900 + signal-red, giant `01/05`
+  numerals, `§01` section markers, "BY THE NUMBERS" right rail.
+
+Content inside each pane:
+
+- **Left rail** — pinned slash commands / agents / pipelines drawn from
+  the real registries, plus a day timeline.
+- **Center** — greeting, cards for overnight PR activity and Slack
+  mentions, the latest daily-standup draft (live from
+  `~/.crew/outputs/daily-standup/`), and an action row. *Post to
+  #standup* is disabled until Slack integration lands; *Regenerate*
+  re-runs the `daily-standup` pipeline with stdout captured into an SSE
+  bus; *Edit draft* opens the output in `$EDITOR`; *Skip today*
+  deletes the latest draft.
+- **Right rail** — context panel. Per-theme content: Warm shows recent
+  observations + a gentle note, Terminal shows `~/CONTEXT` kv table +
+  `~/MEMORY.JSONL`, Modernist shows "BY THE NUMBERS" stats + editorial
+  observations.
 
 Aspirational data (timeline events, remembered facts, PR/Slack cards,
 working-on chips) read from JSONL files seeded into `~/.crew/gui/` and
 `~/.crew/memory.jsonl` on first launch. Edit them by hand or let future
-hooks/pipelines append — the GUI picks up changes on next request with no
-code change. The server binds `127.0.0.1` only; no auth in v1.
+hooks/pipelines append — the window picks up changes on the next
+request. Internal server binds `127.0.0.1` only; no auth in v1.
 
 ## Tests
 

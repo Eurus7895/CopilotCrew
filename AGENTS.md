@@ -49,16 +49,24 @@ the Copilot SDK. Read `CLAUDE.md` for the full design doc.
 - `pipelines/` — self-contained pipeline directories;
   `pipelines/standup/` (Level 0) and `pipelines/incident-triage/`
   (Level 1, generator + evaluator + correction loop)
-- `crew/gui/` — optional local web dashboard (`[gui]` extra), launched
-  via `crew gui`. FastAPI + Jinja2 + HTMX + vanilla CSS, no build step.
-  Routes under `crew/gui/routes/`, bridge logic in `crew/gui/services/`
-  (`pinned`, `mocks`, `standup_service`, `status_service`, `editor`,
-  `events_bus`, `bootstrap`). Pinned rail and the standup card are live
-  over real registries + `~/.crew/outputs/daily-standup/`; timeline,
-  facts, PR/Slack cards, and working-on chips read JSONL stubs seeded
-  into `~/.crew/gui/` and `~/.crew/memory.jsonl`. Pipeline invocation
-  reuses `pipeline_runner.run_pipeline` with stdout redirected into an
-  SSE pub/sub; a module lock blocks concurrent runs. Copilot SDK imports
+- `crew/gui/` — optional desktop GUI (`[gui]` extra), launched via
+  `crew gui`. FastAPI + Jinja2 + HTMX + vanilla CSS inside a PyWebView
+  native window. `crew/gui/server.py` runs uvicorn on an ephemeral
+  localhost port in a daemon thread and opens the window against that
+  port; `--no-window` falls back to a blocking server for CI / remote
+  dev. Three swappable design languages live under
+  `crew/gui/templates/themes/{warm,terminal,modernist}/` + matching
+  `crew/gui/static/themes/<name>.css`; the theme resolver in
+  `crew/gui/routes/_shared.py` picks one from `?theme=` query (sets a
+  cookie) / the `crew_theme` cookie / default (`warm`). Bridge logic in
+  `crew/gui/services/` (`pinned`, `mocks`, `standup_service`,
+  `status_service`, `editor`, `events_bus`, `bootstrap`). Pinned rail
+  and the standup card are live over real registries +
+  `~/.crew/outputs/daily-standup/`; timeline, facts, PR/Slack cards,
+  and working-on chips read JSONL stubs seeded into `~/.crew/gui/` and
+  `~/.crew/memory.jsonl`. Pipeline invocation reuses
+  `pipeline_runner.run_pipeline` with stdout redirected into an SSE
+  pub/sub; a module lock blocks concurrent runs. Copilot SDK imports
   inside `standup_service` are lazy so the GUI boots even without the
   SDK for read-only use
 
@@ -114,9 +122,12 @@ One user-facing flag: `--new` to force fresh. Pipelines + the evaluator
 stay one-shot — guarded by runtime tests asserting no `session_id` is
 ever passed to `create_session` from the runner.
 
-The GUI landed alongside Day 4-A: `crew gui` launches a three-pane
-FastAPI dashboard (left rail pinned items + day timeline, center
-cards + standup draft, right rail memory/facts). Read-only viewer
+The desktop GUI landed alongside Day 4-A: `crew gui` opens a
+native PyWebView window (three-pane "always-open pane", left rail
+pinned items + day timeline, center cards + standup draft, right
+rail memory/facts) in one of three swappable design languages —
+Warm · Workspace, Terminal · Operator, or Modernist · Swiss —
+selectable from the tab strip in the page header. Read-only viewer
 plus a launcher for the daily-standup pipeline — no new pipelines,
 no new backend concepts. CLI remains primary.
 

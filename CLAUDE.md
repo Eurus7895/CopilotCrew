@@ -699,19 +699,28 @@ format (see Phase 2). No migration.
 ### Phase 6 — SSO / Enterprise Auth (Month 4+)
 Only after team adoption proven.
 
-### Phase 7 — Web Dashboard (shipped alongside Day 4-A)
-FastAPI + Jinja2 + HTMX + vanilla CSS, optional `[gui]` extra,
-launched via `crew gui`. Three panes: pinned rail (real registries)
-+ day timeline, center cards (PR activity, Slack mentions, standup
-draft), right rail working-on chips + remembered facts. Live data:
-pinned rail + standup draft from `~/.crew/outputs/daily-standup/`.
-Stub JSONL data: `~/.crew/gui/{timeline,pr_activity,slack_mentions,
-working_on}.jsonl` and `~/.crew/memory.jsonl`, seeded on first run so
-future hooks/pipelines can append without GUI changes. Regenerate
-re-runs the `daily-standup` pipeline with stdout captured into an SSE
-bus; a module-level lock blocks concurrent runs. Binds `127.0.0.1`;
-no auth in v1. "Post to #standup" is wired only to the UI — Slack
-integration is deferred. CLI remains primary.
+### Phase 7 — Desktop GUI (shipped alongside Day 4-A)
+FastAPI + Jinja2 + HTMX + vanilla CSS wrapped in a PyWebView native
+window. Optional `[gui]` extra; launched via `crew gui` — no browser
+and no user-visible server. Internally uvicorn runs on an ephemeral
+localhost port in a daemon thread; the window points at it. A
+`--no-window` flag drops back to a blocking server for CI / remote
+dev. Three panes (pinned rail + day timeline; center cards; right
+rail context) rendered in three swappable design languages —
+**Warm · Workspace** (warm neutrals, paper cards, polaroid avatar),
+**Terminal · Operator** (tmux amber-on-black, ASCII rules, vim hints,
+`crew>` prompt), and **Modernist · Swiss** (Archivo + signal-red,
+giant numerals, §NN markers, "BY THE NUMBERS" stats rail). Theme
+picked from `?theme=` query (sets a `crew_theme` cookie), cookie, or
+default (warm). Live data: pinned rail + standup draft from
+`~/.crew/outputs/daily-standup/`. Stub JSONL data:
+`~/.crew/gui/{timeline,pr_activity,slack_mentions,working_on}.jsonl`
+and `~/.crew/memory.jsonl`, seeded on first run so future
+hooks/pipelines can append without GUI changes. Regenerate re-runs
+the `daily-standup` pipeline with stdout captured into an SSE bus; a
+module-level lock blocks concurrent runs. "Post to #standup" is
+wired only to the UI — Slack integration is deferred. CLI remains
+primary.
 
 ---
 
