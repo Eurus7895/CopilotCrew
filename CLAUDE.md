@@ -653,22 +653,26 @@ Implementation notes:
 
 ### Day 4-B — Streaming + remaining pipelines
 ```
-[ ] streamer.py: terminal output + summary mode
-[ ] ticket-refinement, code-review-routing, release-notes
-[ ] Test all 5 pipelines end-to-end on real team data
+[x] streamer.py: Terminal / Summary / Callback strategies; pipeline
+    runner + direct mode both accept an optional `streamer` kwarg
+[x] ticket-refinement (L1), code-review-routing (L1), release-notes (L0)
+[ ] Test all 5 pipelines end-to-end on real team data (run on real
+    GitHub + Copilot; not automatable in-repo)
 ```
 
-### Day 4-C — GUI interactivity (planned)
+### Day 4-C — GUI interactivity (shipped)
 ```
-[ ] POST /chat route → bridges to crew.direct.run_direct, reuses
-    the per-scope session cache; tokens stream over the SSE bus
-[ ] Per-theme message-bubble area + composer wiring (Warm chat,
-    Terminal crew> prompt, Modernist composer)
-[ ] Clickable pinned items (slash-commands fire skills, agents open
-    a persona'd chat, pipelines kick off runs, memory.jsonl opens
-    in $EDITOR)
-[ ] Visible regenerate stream in the standup card (listens to
-    pipeline_progress SSE; no backend change)
+[x] POST /chat route bridging to crew.direct.run_direct, reusing the
+    per-scope session cache via crew.conversations; tokens stream
+    over the SSE bus as chat_token events
+[x] Per-theme chat_turn.html + message-bubble area + composer wiring
+    (Warm paper bubbles, Terminal crew>/you> grid, Modernist editorial
+    entries under §-rule)
+[x] Clickable pinned items: POST /pinned/{kind}/{name} dispatches
+    skills (append skill_prompt), agents (swap agent_prompt),
+    pipelines (kick off a run), plus POST /pinned/memory → $EDITOR
+[x] Visible regenerate stream in the standup card (#standup-progress
+    strip listens to pipeline_progress SSE; no backend change)
 ```
 See Phase 7 "Next — interactivity" for the full spec.
 
@@ -739,10 +743,11 @@ module-level lock blocks concurrent runs. Theme picker lives at
 `/settings` (cookie-persisted). "Post to #standup" is wired only to
 the UI — Slack integration is deferred. CLI remains primary.
 
-**Next — interactivity (planned).** The shipped GUI is a viewer +
-launcher. The mockup's chat input and pinned items are still
-decorative; three increments wire them to real backend behaviour, in
-payoff order:
+**Interactivity — shipped (Day 4-C).** The GUI is no longer read-only:
+the mockup's chat input and pinned items now dispatch to real Crew
+primitives, and the standup regenerate stream is visible live in each
+theme. Three increments, all reusing the existing SSE bus +
+`crew.streamer.CallbackStreamer`:
 
 1. **Chat input.** The theme-specific input strip ("Tell Crew about
    morning…" in Warm, `crew>` in Terminal, a bottom composer in
@@ -848,6 +853,6 @@ but shipped alongside Day 4-A. See **Phase 7 — Web Dashboard** above.
 
 *Updated: April 2026*
 *Product: Crew*
-*Phase: Day 4-A + GUI (Phase 7, viewer + launcher) shipped; Day 4-B + 4-C next*
+*Phase: Day 4-A / 4-B / 4-C all shipped; Day 5 next*
 *First user: Current team*
-*Next: Day 4-B — streamer + remaining pipelines; Day 4-C — GUI interactivity (chat input, clickable pinned items, visible regenerate stream)*
+*Next: Day 5 — hardening (baseline checks in session-start hook, `crew logs` / `crew status` / `crew resume`, README polish), then first team-member pilot*

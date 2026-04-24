@@ -5,19 +5,24 @@ for the full design doc and `AGENTS.md` for session-start orientation.
 
 ## Status
 
-**Day 4-A of the build order, plus the desktop GUI.** Level 1 pipelines
-ship with an isolated evaluator + correction loop
-(`pipelines/incident-triage/`); direct + agent + slash modes auto-resume
-their per-(cwd, mode, [agent|skill]) Copilot session and rotate silently
-every ~20 turns (`--new` starts fresh). `crew gui` opens a native
-desktop window (PyWebView) showing a three-pane "always-open pane" with
-pinned commands, a day timeline, the latest standup draft, and a
-remembered-facts panel — rendered in any of three design languages
-(Warm · Workspace, Terminal · Operator, Modernist · Swiss) swappable
-from a tab strip. Sits on top of Day 3 (evaluator + `incident-triage`),
-Day 2.8 (slash commands invoke skills; `skills/debug/`), Day 2.5's
-3-way intent router (direct / agent / pipeline), and Day 2's pipeline
-runner + hook registry. Pipelines and the evaluator are always one-shot
+**Days 4-A / 4-B / 4-C all shipped.** Level 1 pipelines ship with an
+isolated evaluator + correction loop (`pipelines/incident-triage/`);
+direct + agent + slash modes auto-resume their per-(cwd, mode,
+[agent|skill]) Copilot session and rotate silently every ~20 turns
+(`--new` starts fresh). Five pipelines now ship in-repo:
+`daily-standup` (L0), `release-notes` (L0), `incident-triage` (L1),
+`ticket-refinement` (L1), and `code-review-routing` (L1). A shared
+`crew/streamer.py` module surfaces SDK deltas through three
+strategies (Terminal for the CLI, Summary for tests, Callback for the
+GUI). `crew gui` opens a native desktop window (PyWebView) showing a
+three-pane dashboard with clickable pinned shortcuts, a live chat
+composer, a visible regenerate-progress strip on the standup card,
+and three swappable design languages (Warm · Workspace,
+Terminal · Operator, Modernist · Swiss) picked from `/settings`.
+Sits on top of Day 3 (evaluator + `incident-triage`), Day 2.8 (slash
+commands invoke skills; `skills/debug/`), Day 2.5's 3-way intent
+router (direct / agent / pipeline), and Day 2's pipeline runner +
+hook registry. Pipelines and the evaluator are always one-shot
 (CLAUDE.md principle #2). Plugin bundles (shareable directories of
 skills) are roadmapped for Phase 2+.
 
@@ -141,7 +146,15 @@ Outputs land in `dist/`:
 See `packaging/README.md` for icons, code-signing, and a cross-platform
 GitHub Actions matrix.
 
-Three panes, three swappable design languages (tab strip at the top):
+The window is interactive: typing into the chat composer fires
+`POST /chat` (bridges to direct mode, streams the reply in a bubble
+that fills in live), clicking a pinned `/standup` / `/debug` /
+`agent:coder` / `memory.jsonl` dispatches the right primitive
+(pipeline / skill / agent / `$EDITOR`), and the standup "Regenerate"
+button reveals a progress strip that streams the pipeline's output
+as it arrives.
+
+Three panes, three swappable design languages (picked from `/settings`):
 
 - **Warm · Workspace** (default) — warm neutrals, paper cards, polaroid
   avatar, "A gentle note" panel, chat-style "Tell Crew about…" input.

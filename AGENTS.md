@@ -133,12 +133,26 @@ selectable from `/settings` (cookie-persisted). Read-only viewer
 plus a launcher for the daily-standup pipeline — no new pipelines,
 no new backend concepts. CLI remains primary.
 
-**Next for the GUI (Day 4-C, planned).** The viewer becomes
-interactive: `POST /chat` route bridging to `crew.direct.run_direct`
-to wire up the per-theme chat composer, clickable pinned items
-(skill/agent/pipeline shortcuts), and a visible regenerate stream
-on the standup card. See CLAUDE.md Phase 7 "Next — interactivity"
-for the full spec.
+**Day 4-B shipped.** `crew/streamer.py` extracts SDK-event
+dispatch into three strategies (`TerminalStreamer` for the CLI,
+`SummaryStreamer` for tests / CI, `CallbackStreamer` for the GUI
+SSE fan-out). Three new pipelines landed under `pipelines/`:
+`release-notes` (L0), `ticket-refinement` (L1), and
+`code-review-routing` (L1) — all with prompts, evaluators/schemas
+where applicable, and READMEs. The end-to-end real-team run is
+reserved for the first pilot (needs live GitHub + Copilot).
+
+**Day 4-C shipped.** The GUI is now interactive: `POST /chat`
+bridges to `crew.direct.run_direct` with a `CallbackStreamer` that
+publishes `chat_token` / `chat_done` / `chat_error` events over
+the existing SSE bus; per-theme `chat_turn.html` fragments render
+user + assistant bubbles that fill in live. Pinned items are real
+buttons hitting `POST /pinned/{kind}/{name}` — skills append to
+direct mode, agents swap the persona, pipelines kick off a run
+(daily-standup shares the regenerate lock), and the `memory.jsonl`
+pin opens the file in `$EDITOR`. The standup card gained a
+`#standup-progress` strip that streams `pipeline_progress` deltas
+as Crew writes them.
 
 Earlier days, in order: Day 2 (pipeline runner + hooks +
 `daily-standup`), Day 2.5 (3-way router + `agents/` directory), Day 2.8
