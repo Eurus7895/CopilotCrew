@@ -13,13 +13,24 @@
   {% include "themes/terminal/card_standup.html" %}
   {% include "themes/terminal/action_row.html" %}
 
-  <form class="term-prompt" onsubmit="return false;">
+  <section class="term-chat-log" id="chat-log" aria-live="polite"></section>
+
+  <form
+    class="term-prompt"
+    hx-post="/chat"
+    hx-target="#chat-log"
+    hx-swap="beforeend"
+    hx-on::after-request="this.querySelector('.term-prompt-input').value = ''"
+  >
     <span class="term-prompt-label">crew&gt;</span>
     <input
       type="text"
+      name="message"
       class="term-prompt-input"
       placeholder="ask about {{ (selected_event.label if selected_event else 'morning') | lower }}"
       aria-label="crew prompt"
+      autocomplete="off"
+      required
     >
   </form>
 </article>

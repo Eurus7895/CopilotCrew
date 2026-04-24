@@ -226,6 +226,63 @@ body.theme-terminal {
   border-radius: 2px;
 }
 
+/* Chat log */
+.term-chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+.term-chat-log:empty { display: none; }
+.term-turn { display: flex; flex-direction: column; gap: 4px; }
+.term-bubble {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 8px;
+  padding: 2px 0;
+  font-size: 12.5px;
+}
+.term-bubble-prompt {
+  color: var(--t-amber);
+  font-weight: 600;
+}
+.term-bubble-user .term-bubble-prompt { color: var(--t-fg-mut); }
+.term-bubble-body { white-space: pre-wrap; color: var(--t-fg); }
+.term-bubble-body[data-state="streaming"]::after {
+  content: "▌";
+  color: var(--t-amber);
+  animation: term-blink 0.9s steps(2) infinite;
+}
+@keyframes term-blink { 50% { opacity: 0.3; } }
+.term-bubble-body[data-state="error"] { color: var(--t-red); }
+
+.term-standup-progress {
+  background: #0a0906;
+  border: 1px solid #2a2416;
+  color: var(--t-amber);
+}
+.term-standup-progress .standup-progress-head { color: var(--t-amber); }
+.term-standup-progress .standup-progress-body { color: var(--t-fg); }
+
+/* Pinned buttons */
+.term-pin-btn {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  background: transparent;
+  border: none;
+  color: var(--t-fg);
+  font-family: var(--t-font);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  border-radius: 2px;
+}
+.term-pin-btn:hover { background: #1b1810; color: var(--t-amber-hi); }
+
 /* Prompt */
 .term-prompt {
   display: flex; align-items: center; gap: 8px;

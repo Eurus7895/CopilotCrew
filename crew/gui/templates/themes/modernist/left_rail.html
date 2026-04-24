@@ -26,6 +26,31 @@
     {% endfor %}
   </ol>
 
+  <div class="mod-kicker mod-kicker-spaced">Pinned</div>
+  <ul class="mod-pinned">
+    {% for item in pinned_items %}
+      <li>
+        <button
+          type="button"
+          class="mod-pin"
+          hx-post="/pinned/{{ item.kind }}/{{ item.name }}"
+          hx-target="#chat-log"
+          hx-swap="beforeend"
+          title="{{ item.description }}"
+        >{{ item.label }}</button>
+      </li>
+    {% endfor %}
+    <li>
+      <button
+        type="button"
+        class="mod-pin"
+        hx-post="/pinned/memory"
+        hx-swap="none"
+        title="Open ~/.crew/memory.jsonl"
+      >memory.jsonl</button>
+    </li>
+  </ul>
+
   <div class="mod-footnote">
     <div>Set in Archivo</div>
     <div>&amp; JetBrains Mono</div>

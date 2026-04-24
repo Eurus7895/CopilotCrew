@@ -28,11 +28,32 @@
     <div class="term-path">~/PINNED</div>
     <ul class="term-tree">
       {% for item in pinned_items %}
-        <li class="term-pin">
-          <span class="term-session-mark">&minus;</span>
-          <span class="term-pin-label">{% if item.kind == "agent" %}@{{ item.name }}{% else %}{{ item.label }}{% endif %}</span>
+        <li>
+          <button
+            type="button"
+            class="term-pin term-pin-btn"
+            hx-post="/pinned/{{ item.kind }}/{{ item.name }}"
+            hx-target="#chat-log"
+            hx-swap="beforeend"
+            title="{{ item.description }}"
+          >
+            <span class="term-session-mark">&minus;</span>
+            <span class="term-pin-label">{% if item.kind == "agent" %}@{{ item.name }}{% else %}{{ item.label }}{% endif %}</span>
+          </button>
         </li>
       {% endfor %}
+      <li>
+        <button
+          type="button"
+          class="term-pin term-pin-btn"
+          hx-post="/pinned/memory"
+          hx-swap="none"
+          title="Open ~/.crew/memory.jsonl"
+        >
+          <span class="term-session-mark">&minus;</span>
+          <span class="term-pin-label">memory.jsonl</span>
+        </button>
+      </li>
     </ul>
   </section>
 

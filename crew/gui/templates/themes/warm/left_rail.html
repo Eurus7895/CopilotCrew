@@ -40,16 +40,33 @@
     <h2 class="warm-section-head">Pinned</h2>
     <ul class="warm-pinned">
       {% for item in pinned_items %}
-        <li class="warm-pin pin-{{ item.kind }}" title="{{ item.description }}">
-          <span class="warm-pin-glyph" aria-hidden="true"></span>
-          <span class="warm-pin-label">{{ item.label }}</span>
+        <li>
+          <button
+            type="button"
+            class="warm-pin pin-{{ item.kind }}"
+            title="{{ item.description }}"
+            hx-post="/pinned/{{ item.kind }}/{{ item.name }}"
+            hx-target="#chat-log"
+            hx-swap="beforeend"
+          >
+            <span class="warm-pin-glyph" aria-hidden="true"></span>
+            <span class="warm-pin-label">{{ item.label }}</span>
+          </button>
         </li>
       {% else %}
         <li class="warm-empty">no pinned items</li>
       {% endfor %}
-      <li class="warm-pin pin-file">
-        <span class="warm-pin-glyph" aria-hidden="true"></span>
-        <span class="warm-pin-label">memory.jsonl</span>
+      <li>
+        <button
+          type="button"
+          class="warm-pin pin-file"
+          title="Open ~/.crew/memory.jsonl in $EDITOR"
+          hx-post="/pinned/memory"
+          hx-swap="none"
+        >
+          <span class="warm-pin-glyph" aria-hidden="true"></span>
+          <span class="warm-pin-label">memory.jsonl</span>
+        </button>
       </li>
     </ul>
   </section>

@@ -116,6 +116,11 @@ body.theme-warm {
   font-size: 12.5px;
   font-family: var(--w-font-mono);
   color: var(--w-ink);
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
 }
 .warm-pin:hover { background: rgba(255,255,255,0.45); }
 .warm-pin-glyph {
@@ -269,7 +274,48 @@ body.theme-warm {
 .warm-btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
 .warm-btn-ghost { border-style: dashed; color: var(--w-ink-mut); background: transparent; }
 
-/* Chat */
+/* Chat log */
+.warm-chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 20px;
+}
+.warm-chat-log:empty { display: none; }
+.warm-turn { display: flex; flex-direction: column; gap: 8px; }
+.warm-bubble {
+  background: var(--w-card);
+  border: 1px solid var(--w-border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13.5px;
+  max-width: 90%;
+  box-shadow: var(--w-shadow);
+}
+.warm-bubble-user {
+  align-self: flex-end;
+  background: #fbf0d9;
+  border-color: #ead9ab;
+}
+.warm-bubble-crew { align-self: flex-start; }
+.warm-bubble-author {
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--w-ink-fnt);
+  margin-bottom: 2px;
+}
+.warm-bubble-body { white-space: pre-wrap; }
+.warm-bubble-body[data-state="streaming"]::after {
+  content: "▌";
+  opacity: 0.5;
+  margin-left: 2px;
+  animation: warm-blink 1s steps(2) infinite;
+}
+@keyframes warm-blink { 50% { opacity: 0; } }
+.warm-bubble-body[data-state="error"] { color: var(--w-accent); }
+
+/* Chat composer */
 .warm-chat {
   display: flex;
   align-items: center;
@@ -341,6 +387,13 @@ body.theme-warm {
 .warm-empty-card { color: var(--w-ink-mut); font-style: italic; }
 
 /* Settings */
+.warm-standup-progress {
+  background: #fafaf7;
+  border: 1px dashed var(--w-border);
+  color: var(--w-ink);
+}
+.warm-standup-progress .standup-progress-head { color: var(--w-ink-fnt); }
+
 .warm-settings-section { margin-bottom: 16px; }
 .warm-theme-grid { display: grid; gap: 10px; }
 .warm-theme-form { margin: 0; }

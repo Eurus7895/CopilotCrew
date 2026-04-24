@@ -363,6 +363,89 @@ a.mod-nav-item:hover { color: var(--m-ink); }
   line-height: 1.5;
 }
 
+.mod-standup-progress {
+  background: var(--m-paper);
+  border: 1px solid var(--m-border);
+  border-top: none;
+}
+.mod-standup-progress .standup-progress-head { color: var(--m-red); letter-spacing: 0.2em; }
+.mod-standup-progress .standup-progress-body { color: var(--m-ink); }
+
+/* Pinned (sits under The Index) */
+.mod-pinned { list-style: none; padding: 0; margin: 0; }
+.mod-pinned li { margin-bottom: 2px; }
+.mod-pin {
+  font-family: var(--m-font-mono);
+  font-size: 12px;
+  background: transparent;
+  border: none;
+  padding: 4px 0;
+  color: var(--m-ink);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  letter-spacing: 0.02em;
+}
+.mod-pin:hover { color: var(--m-red); }
+
+/* Chat log */
+.mod-chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 2px solid var(--m-rule);
+}
+.mod-chat-log:empty { display: none; }
+.mod-turn { display: flex; flex-direction: column; gap: 10px; }
+.mod-bubble {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 20px;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--m-border);
+}
+.mod-bubble:last-child { border-bottom: none; }
+.mod-bubble-label {
+  font-family: var(--m-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  color: var(--m-ink-fnt);
+}
+.mod-bubble-user .mod-bubble-label { color: var(--m-red); }
+.mod-bubble-body {
+  white-space: pre-wrap;
+  font-size: 14px;
+  color: var(--m-ink);
+}
+.mod-bubble-body[data-state="streaming"]::after {
+  content: "▮";
+  color: var(--m-red);
+  margin-left: 4px;
+  animation: mod-blink 1s steps(2) infinite;
+}
+@keyframes mod-blink { 50% { opacity: 0.2; } }
+.mod-bubble-body[data-state="error"] { color: var(--m-red); }
+
+/* Chat composer */
+.mod-chat {
+  display: flex; align-items: center; gap: 14px;
+  margin-top: 18px;
+  padding: 14px 16px;
+  background: var(--m-paper);
+  border: 1px solid var(--m-ink);
+}
+.mod-chat-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font: inherit;
+  font-size: 14px;
+  color: var(--m-ink);
+  background: transparent;
+}
+
 /* Settings */
 .mod-theme-list { list-style: none; padding: 0; margin: 0; }
 .mod-theme-form { margin: 0; }

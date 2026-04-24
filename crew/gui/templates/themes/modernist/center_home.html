@@ -19,4 +19,26 @@
   {% include "themes/modernist/card_mentions.html" %}
   {% include "themes/modernist/card_standup.html" %}
   {% include "themes/modernist/action_row.html" %}
+
+  <section class="mod-chat-log" id="chat-log" aria-live="polite"></section>
+
+  <form
+    class="mod-chat"
+    hx-post="/chat"
+    hx-target="#chat-log"
+    hx-swap="beforeend"
+    hx-on::after-request="this.querySelector('.mod-chat-input').value = ''"
+  >
+    <span class="mod-section-marker" aria-hidden="true">&sect;</span>
+    <input
+      type="text"
+      name="message"
+      class="mod-chat-input"
+      placeholder="Dispatch to Crew…"
+      aria-label="Message Crew"
+      autocomplete="off"
+      required
+    >
+    <button type="submit" class="mod-btn mod-btn-primary">Send</button>
+  </form>
 </article>

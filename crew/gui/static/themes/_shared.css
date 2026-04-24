@@ -46,3 +46,30 @@ button { cursor: pointer; }
 .swatch-warm      { background: linear-gradient(135deg, #f4eedf 50%, #b35836 50%); }
 .swatch-terminal  { background: linear-gradient(135deg, #0b0b08 50%, #d4a74a 50%); }
 .swatch-modernist { background: linear-gradient(135deg, #f5f3ec 50%, #e53022 50%); }
+
+/* Regenerate progress strip — theme-agnostic skeleton; each theme
+   overrides background/border/colour. Hidden until the SSE bus sees
+   a pipeline_progress event. */
+.standup-progress {
+  margin-top: 10px;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+.standup-progress[hidden] { display: none; }
+.standup-progress-head {
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  margin-bottom: 6px;
+}
+.standup-progress-body {
+  margin: 0;
+  max-height: 160px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11.5px;
+  line-height: 1.55;
+}
