@@ -6,11 +6,11 @@
       <span class="mod-issue">&ndash; &#8470; 01 / 0{{ timeline|length or 5 }} &middot; APR 24</span>
     </div>
     <nav class="mod-nav" aria-label="Sections">
-      <a class="mod-nav-item mod-nav-selected">Today</a>
+      <a class="mod-nav-item {% if selected_page == 'home' %}mod-nav-selected{% endif %}" href="/">Today</a>
       <a class="mod-nav-item">Archive</a>
       <a class="mod-nav-item">Memory</a>
       <a class="mod-nav-item">Agents</a>
-      <a class="mod-nav-item">Settings</a>
+      <a class="mod-nav-item {% if selected_page == 'settings' %}mod-nav-selected{% endif %}" href="/settings">Settings</a>
     </nav>
     <div class="mod-masthead-right">
       <div class="mod-user">{{ cfg.user_name | upper }} &middot; DEV</div>
@@ -21,7 +21,11 @@
   <div class="mod-body">
     {% include "themes/modernist/left_rail.html" %}
     <section class="mod-center" id="center" aria-label="Current moment">
-      {% include "themes/modernist/center_home.html" %}
+      {% if selected_page == "settings" %}
+        {% include "themes/modernist/settings_center.html" %}
+      {% else %}
+        {% include "themes/modernist/center_home.html" %}
+      {% endif %}
     </section>
     {% include "themes/modernist/right_rail.html" %}
   </div>

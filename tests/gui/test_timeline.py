@@ -6,16 +6,15 @@ from __future__ import annotations
 def test_timeline_event_returns_full_page_without_hx(client):
     r = client.get("/timeline/morning")
     assert r.status_code == 200
-    # Full shell has the page header.
-    assert "page-head" in r.text
+    # Full shell: the window is the entire app — no external page header.
+    assert 'data-theme="warm"' in r.text
+    assert "warm-window" in r.text
 
 
 def test_timeline_event_returns_fragment_with_hx_request(client):
     r = client.get("/timeline/nudge", headers={"HX-Request": "true"})
     assert r.status_code == 200
-    # Fragment must not include the outer chrome (page head, window, theme tabs).
-    assert "page-head" not in r.text
-    assert "theme-tabs" not in r.text
+    # Fragment must not include the full window shell.
     assert "warm-window" not in r.text
     # But it must include the theme's center timeline article.
     assert "warm-moment" in r.text

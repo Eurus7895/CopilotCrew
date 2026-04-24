@@ -37,6 +37,7 @@ async def home(request: Request) -> HTMLResponse:
         "prs": mocks.load_pr_activity(cfg),
         "mentions": mocks.load_slack_mentions(cfg),
         "draft": standup_service.latest_draft(cfg),
+        "selected_page": "home",
         **theme_context(theme),
     }
     response = templates.TemplateResponse(request, "base.html", ctx)

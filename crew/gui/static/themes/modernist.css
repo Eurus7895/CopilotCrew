@@ -24,22 +24,12 @@ body.theme-modernist {
   line-height: 1.5;
 }
 
-body.theme-modernist .page-head h1 { font-weight: 900; letter-spacing: -0.015em; }
-body.theme-modernist .page-head .tagline,
-body.theme-modernist .page-head .theme-note { color: var(--m-ink-mut); }
-body.theme-modernist .theme-tabs { background: #d8d5ce; }
-body.theme-modernist .theme-tabs .tab { color: var(--m-ink-mut); font-family: var(--m-font-ui); font-weight: 500; }
-body.theme-modernist .theme-tabs .tab.selected {
-  background: var(--m-paper); color: var(--m-ink);
-  box-shadow: 0 1px 0 rgba(0,0,0,0.08);
-}
-
-/* Window */
+/* Window = the whole app. Fills the viewport; no outer chrome. */
 .mod-window {
   background: var(--m-window);
-  border: 1px solid var(--m-border);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 10px 30px rgba(0,0,0,0.06);
-  overflow: hidden;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Masthead */
@@ -82,6 +72,8 @@ body.theme-modernist .theme-tabs .tab.selected {
   color: var(--m-ink);
   border-bottom: 2px solid var(--m-red);
 }
+a.mod-nav-item { cursor: pointer; }
+a.mod-nav-item:hover { color: var(--m-ink); }
 .mod-masthead-right {
   margin-left: 24px;
   font-family: var(--m-font-mono);
@@ -94,8 +86,8 @@ body.theme-modernist .theme-tabs .tab.selected {
 /* Body grid */
 .mod-body {
   display: grid;
-  grid-template-columns: 240px 1fr 280px;
-  min-height: 640px;
+  grid-template-columns: 240px 1fr 300px;
+  flex: 1;
 }
 .mod-rail {
   padding: 28px 24px;
@@ -369,6 +361,37 @@ body.theme-modernist .theme-tabs .tab.selected {
   font-size: 13px;
   color: var(--m-ink);
   line-height: 1.5;
+}
+
+/* Settings */
+.mod-theme-list { list-style: none; padding: 0; margin: 0; }
+.mod-theme-form { margin: 0; }
+.mod-theme-row {
+  display: grid;
+  grid-template-columns: 28px 200px 1fr 90px;
+  gap: 20px;
+  align-items: baseline;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-top: 1px dashed var(--m-border);
+  padding: 14px 0;
+  text-align: left;
+  font-family: var(--m-font-ui);
+  color: var(--m-ink);
+  font-size: 14px;
+}
+.mod-theme-row:first-child { border-top: none; }
+.mod-theme-row:hover { background: rgba(0,0,0,0.02); }
+.mod-theme-row.selected { background: rgba(229, 48, 34, 0.04); }
+.mod-theme-label { font-weight: 700; }
+.mod-theme-blurb { color: var(--m-ink-mut); font-size: 13px; }
+.mod-theme-state {
+  font-family: var(--m-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  color: var(--m-red);
+  text-align: right;
 }
 
 /* Footer */

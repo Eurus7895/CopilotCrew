@@ -19,13 +19,18 @@ def test_home_renders_three_panes(client):
     assert "warm-left" in html
     assert "warm-center" in html
     assert "warm-right" in html
-    # Header copy matches the four-directions mockup.
-    assert "Crew &mdash; four directions" in html
+    # The window IS the app — no external page-head / tab-strip.
+    assert "Crew &mdash; four directions" not in html
+    assert "theme-tabs" not in html
+    assert 'class="page-head"' not in html
+    # Greeting renders.
     assert "Good morning" in html
-    # Tab strip includes all three design languages.
-    assert "Warm · Workspace" in html
-    assert "Terminal · Operator" in html
-    assert "Modernist · Swiss" in html
+
+
+def test_home_has_settings_entry_point(client):
+    html = client.get("/").text
+    # Warm theme: gear link points at /settings.
+    assert 'href="/settings"' in html
 
 
 def test_home_seeds_gui_dir_and_memory(client, gui_config):

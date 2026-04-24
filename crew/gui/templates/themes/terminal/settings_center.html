@@ -1,0 +1,40 @@
+<article class="term-log">
+  <div class="term-log-head">
+    <span class="term-bracket">[:config]</span>
+    <span class="term-tag">SETTINGS</span>
+    <span class="term-path-inline">session/settings.log</span>
+  </div>
+
+  <h2 class="term-greeting">settings</h2>
+  <p class="term-quote">&gt; pick your grammar. :q to go back.</p>
+
+  <section class="term-card">
+    <div class="term-rule">&mdash; $THEMES &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</div>
+    {% for t in themes %}
+      <form method="post" action="/settings/theme/{{ t }}" class="term-theme-form">
+        <button type="submit" class="term-theme-row {% if t == theme %}selected{% endif %}">
+          <span class="term-theme-mark">{% if t == theme %}&rsaquo;{% else %}&middot;{% endif %}</span>
+          <span class="term-ref">[{{ t }}]</span>
+          <span class="term-theme-label">{{ theme_meta[t].label | lower }}</span>
+          {% if t == theme %}<span class="term-theme-current">current</span>{% endif %}
+        </button>
+      </form>
+    {% endfor %}
+  </section>
+
+  <section class="term-card">
+    <div class="term-rule">&mdash; $SESSION &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</div>
+    <table class="term-kv">
+      <tr><td>model</td><td>{{ status.model }}</td></tr>
+      <tr><td>user</td><td>{{ cfg.user_name | lower }}</td></tr>
+      <tr><td>$CREW_HOME</td><td>{{ cfg.crew_home }}</td></tr>
+      <tr><td>$MEMORY</td><td>{{ cfg.memory_path }}</td></tr>
+    </table>
+  </section>
+
+  <div class="term-actions">
+    <a class="term-key" href="/">
+      <span class="term-kbd">q</span> back to log
+    </a>
+  </div>
+</article>

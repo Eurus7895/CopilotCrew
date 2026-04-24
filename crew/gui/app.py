@@ -34,7 +34,7 @@ def create_app(config: GUIConfig | None = None) -> FastAPI:
         return JSONResponse({"ok": True})
 
     # Lazy imports so route modules can freely import app.state shape.
-    from crew.gui.routes import context, events, home, standup, status, timeline
+    from crew.gui.routes import context, events, home, settings, standup, status, timeline
 
     app.include_router(home.router)
     app.include_router(timeline.router)
@@ -42,5 +42,6 @@ def create_app(config: GUIConfig | None = None) -> FastAPI:
     app.include_router(standup.router)
     app.include_router(status.router)
     app.include_router(events.router)
+    app.include_router(settings.router)
 
     return app

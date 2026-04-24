@@ -17,19 +17,16 @@ THEME_COOKIE = "crew_theme"
 
 THEME_META = {
     "warm": {
-        "tab_label": "Warm · Workspace",
-        "tag": "warm",
-        "tagline": "Warm neutrals, paper cards with soft shadow, a polaroid avatar. Crew as a coworker you'd actually want at your desk.",
+        "label": "Warm · Workspace",
+        "blurb": "Warm neutrals, paper cards with soft shadow, a polaroid avatar.",
     },
     "terminal": {
-        "tab_label": "Terminal · Operator",
-        "tag": "terminal",
-        "tagline": "tmux-style operator console. Phosphor amber on pitch black, ASCII section rules, vim keybindings, CRT scanlines.",
+        "label": "Terminal · Operator",
+        "blurb": "tmux-style console. Phosphor amber on pitch black, ASCII rules, vim hints.",
     },
     "modernist": {
-        "tab_label": "Modernist · Swiss",
-        "tag": "modernist",
-        "tagline": "12-col grid, Archivo, signal-red accent. Giant numerals, all-caps mono labels. Bloomberg energy with editorial restraint.",
+        "label": "Modernist · Swiss",
+        "blurb": "12-col grid, Archivo, signal-red accent. Giant numerals, all-caps mono labels.",
     },
 }
 
@@ -83,7 +80,12 @@ def is_htmx(request: Request) -> bool:
 
 
 def resolve_theme(request: Request) -> str:
-    """Pick the active theme: query param wins, then cookie, else default."""
+    """Pick the active theme: query param wins, then cookie, else default.
+
+    The query-param path remains as a developer-only backdoor. Users
+    switch themes from the Settings panel, which POSTs to
+    ``/settings/theme`` and sets the cookie.
+    """
     q = (request.query_params.get("theme") or "").strip().lower()
     if q in THEMES:
         return q

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Crew — {{ theme_meta[theme].tab_label }}</title>
+  <title>Crew</title>
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <link rel="stylesheet" href="/static/themes/_shared.css">
   <link rel="stylesheet" href="/static/themes/{{ theme }}.css">
@@ -11,20 +11,7 @@
   <script src="/static/app.js" defer></script>
 </head>
 <body class="theme-{{ theme }}">
-  <main class="page">
-    <header class="page-head">
-      <h1>Crew &mdash; four directions</h1>
-      <p class="tagline">
-        Same coworker, four design languages. Click each tab to swap between them.
-        The data is identical across all four &mdash; the only thing changing is the visual grammar.
-      </p>
-      {% include "tabs.html" %}
-      <p class="theme-note">{{ theme_meta[theme].tagline }}</p>
-    </header>
-
-    {% include "themes/" ~ theme ~ "/window.html" %}
-  </main>
-
+  {% include "themes/" ~ theme ~ "/window.html" %}
   <div id="flash" class="flash" aria-live="polite"></div>
 </body>
 </html>

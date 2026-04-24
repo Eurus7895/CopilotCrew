@@ -1,74 +1,21 @@
-/* Shared reset + page-head + tab strip — applies across all themes.
-   Theme-specific CSS lives in themes/<name>.css. */
+/* Shared reset + flash — applies across all themes.
+   Theme-specific CSS (including full-viewport window sizing) lives in
+   themes/<name>.css. The window IS the app — there is no outer chrome. */
 
 *, *::before, *::after { box-sizing: border-box; }
 
 html, body {
   margin: 0;
   padding: 0;
+  height: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-button { font: inherit; cursor: pointer; }
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
 
-.page {
-  max-width: 1340px;
-  margin: 0 auto;
-  padding: 48px 32px 80px;
-}
-
-.page-head h1 {
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  margin: 0 0 10px;
-}
-
-.page-head .tagline {
-  max-width: 680px;
-  margin: 0 0 20px;
-  font-size: 14px;
-  line-height: 1.55;
-}
-
-.page-head .theme-note {
-  margin: 12px 0 20px;
-  font-size: 13px;
-  font-style: italic;
-}
-
-/* Tab strip */
-.theme-tabs {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px;
-  border-radius: 10px;
-  width: fit-content;
-}
-.theme-tabs .tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  border-radius: 8px;
-  text-decoration: none;
-  font-size: 13px;
-  white-space: nowrap;
-  color: inherit;
-}
-.theme-tabs .tab-glyph { font-size: 10px; opacity: 0.5; }
-.theme-tabs .tab.selected { box-shadow: 0 0 0 1px currentColor; }
-.theme-tabs .tab-size {
-  margin-left: auto;
-  padding-left: 18px;
-  font-size: 12px;
-  opacity: 0.5;
-  font-family: ui-monospace, "JetBrains Mono", monospace;
-}
-
-/* Flash */
+/* Flash toast — bottom-centered, subtle, auto-fades via app.js */
 .flash {
   position: fixed;
   bottom: 24px; left: 50%;
@@ -86,3 +33,16 @@ button { font: inherit; cursor: pointer; }
 .flash.visible { opacity: 1; }
 .flash.warn  { background: #d97706; }
 .flash.error { background: #cc3333; }
+
+/* Theme-swatch primitive used by each theme's settings page. */
+.swatch {
+  display: inline-block;
+  width: 18px; height: 18px;
+  border-radius: 4px;
+  border: 1px solid rgba(0,0,0,0.08);
+  vertical-align: middle;
+  margin-right: 6px;
+}
+.swatch-warm      { background: linear-gradient(135deg, #f4eedf 50%, #b35836 50%); }
+.swatch-terminal  { background: linear-gradient(135deg, #0b0b08 50%, #d4a74a 50%); }
+.swatch-modernist { background: linear-gradient(135deg, #f5f3ec 50%, #e53022 50%); }

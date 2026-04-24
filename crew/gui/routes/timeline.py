@@ -39,6 +39,7 @@ async def timeline_event(request: Request, event_id: str) -> HTMLResponse:
         "prs": mocks.load_pr_activity(cfg),
         "mentions": mocks.load_slack_mentions(cfg),
         "draft": standup_service.latest_draft(cfg),
+        "selected_page": "home",
         **theme_context(theme),
     }
     if is_htmx(request):

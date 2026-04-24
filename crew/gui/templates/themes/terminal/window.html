@@ -1,12 +1,21 @@
 <section class="term-window" id="window">
   <header class="term-titlebar">
     <span class="term-title-left">&#9670; crew | {{ cfg.user_name | lower }}@copilotcrew</span>
+    <a
+      class="term-settings-link {% if selected_page == 'settings' %}selected{% endif %}"
+      href="/settings"
+      title="Settings"
+    >:config</a>
     <span class="term-title-right">session: 1/{{ timeline|length or 5 }} | model: {{ status.model }} | {{ (selected_event.time if selected_event else "8:47 AM") }}</span>
   </header>
   <div class="term-body">
     {% include "themes/terminal/left_rail.html" %}
     <section class="term-center" id="center" aria-label="Current moment">
-      {% include "themes/terminal/center_home.html" %}
+      {% if selected_page == "settings" %}
+        {% include "themes/terminal/settings_center.html" %}
+      {% else %}
+        {% include "themes/terminal/center_home.html" %}
+      {% endif %}
     </section>
     {% include "themes/terminal/right_rail.html" %}
   </div>
