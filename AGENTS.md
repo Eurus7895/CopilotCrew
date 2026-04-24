@@ -129,9 +129,16 @@ native PyWebView window (three-pane "always-open pane", left rail
 pinned items + day timeline, center cards + standup draft, right
 rail memory/facts) in one of three swappable design languages —
 Warm · Workspace, Terminal · Operator, or Modernist · Swiss —
-selectable from the tab strip in the page header. Read-only viewer
+selectable from `/settings` (cookie-persisted). Read-only viewer
 plus a launcher for the daily-standup pipeline — no new pipelines,
 no new backend concepts. CLI remains primary.
+
+**Next for the GUI (Day 4-C, planned).** The viewer becomes
+interactive: `POST /chat` route bridging to `crew.direct.run_direct`
+to wire up the per-theme chat composer, clickable pinned items
+(skill/agent/pipeline shortcuts), and a visible regenerate stream
+on the standup card. See CLAUDE.md Phase 7 "Next — interactivity"
+for the full spec.
 
 Earlier days, in order: Day 2 (pipeline runner + hooks +
 `daily-standup`), Day 2.5 (3-way router + `agents/` directory), Day 2.8

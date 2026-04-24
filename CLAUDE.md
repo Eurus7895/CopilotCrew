@@ -658,6 +658,20 @@ Implementation notes:
 [ ] Test all 5 pipelines end-to-end on real team data
 ```
 
+### Day 4-C — GUI interactivity (planned)
+```
+[ ] POST /chat route → bridges to crew.direct.run_direct, reuses
+    the per-scope session cache; tokens stream over the SSE bus
+[ ] Per-theme message-bubble area + composer wiring (Warm chat,
+    Terminal crew> prompt, Modernist composer)
+[ ] Clickable pinned items (slash-commands fire skills, agents open
+    a persona'd chat, pipelines kick off runs, memory.jsonl opens
+    in $EDITOR)
+[ ] Visible regenerate stream in the standup card (listens to
+    pipeline_progress SSE; no backend change)
+```
+See Phase 7 "Next — interactivity" for the full spec.
+
 ### Day 5 — Hardening + first team member
 ```
 [ ] Baseline checks in session-start hook
@@ -721,9 +735,44 @@ default (warm). Live data: pinned rail + standup draft from
 and `~/.crew/memory.jsonl`, seeded on first run so future
 hooks/pipelines can append without GUI changes. Regenerate re-runs
 the `daily-standup` pipeline with stdout captured into an SSE bus; a
-module-level lock blocks concurrent runs. "Post to #standup" is
-wired only to the UI — Slack integration is deferred. CLI remains
-primary.
+module-level lock blocks concurrent runs. Theme picker lives at
+`/settings` (cookie-persisted). "Post to #standup" is wired only to
+the UI — Slack integration is deferred. CLI remains primary.
+
+**Next — interactivity (planned).** The shipped GUI is a viewer +
+launcher. The mockup's chat input and pinned items are still
+decorative; three increments wire them to real backend behaviour, in
+payoff order:
+
+1. **Chat input.** The theme-specific input strip ("Tell Crew about
+   morning…" in Warm, `crew>` in Terminal, a bottom composer in
+   Modernist) becomes a working conversation channel. A new
+   `POST /chat` route bridges to `crew.direct.run_direct`, reusing the
+   per-scope session cache from `crew/conversations.py`; tokens stream
+   over the existing SSE bus; each theme renders a message-bubble
+   area below the greeting. Turn rotation respects `CREW_TURN_CAP`
+   exactly like the CLI. Pipelines + the evaluator still never resume
+   (principle #2). This is what turns Crew from a dashboard into a
+   coworker.
+
+2. **Clickable pinned items.** Left-rail entries gain handlers:
+   slash-commands (`/debug`) fire the skill as a direct call,
+   `agent:coder` opens a fresh chat with the persona active (routes
+   through `crew.direct` with `agent_prompt`), pipelines (`/standup`)
+   kick off a run gated by the existing concurrency lock,
+   `memory.jsonl` opens the facts file in `$EDITOR`. Reuses the
+   standup `/standup/run` pattern end-to-end.
+
+3. **Visible regenerate stream.** The standup card gets a
+   collapsible progress strip that listens to the `pipeline_progress`
+   SSE events and prints deltas as they arrive — matches the Terminal
+   theme's log aesthetic and gives Warm/Modernist a live-typing
+   indicator. No backend changes; the bus already publishes these.
+
+All three keep the themes in lockstep — the backend is
+theme-agnostic; only the bubble / progress-strip markup is
+per-theme. "Post to #standup" stays disabled until Phase 8 adds
+Slack.
 
 ---
 
@@ -799,6 +848,6 @@ but shipped alongside Day 4-A. See **Phase 7 — Web Dashboard** above.
 
 *Updated: April 2026*
 *Product: Crew*
-*Phase: Day 4-A + GUI (Phase 7) shipped; Day 4-B next*
+*Phase: Day 4-A + GUI (Phase 7, viewer + launcher) shipped; Day 4-B + 4-C next*
 *First user: Current team*
-*Next: Day 4-B — streamer + remaining pipelines (ticket-refinement, code-review-routing, release-notes)*
+*Next: Day 4-B — streamer + remaining pipelines; Day 4-C — GUI interactivity (chat input, clickable pinned items, visible regenerate stream)*
