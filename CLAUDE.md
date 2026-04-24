@@ -702,7 +702,10 @@ Only after team adoption proven.
 ### Phase 7 — Desktop GUI (shipped alongside Day 4-A)
 FastAPI + Jinja2 + HTMX + vanilla CSS wrapped in a PyWebView native
 window. Optional `[gui]` extra; launched via `crew gui` — no browser
-and no user-visible server. Internally uvicorn runs on an ephemeral
+and no user-visible server. Distributable as a double-clickable
+`.app` / `.exe` / AppImage via PyInstaller (`[package]` extra,
+`packaging/crew_gui.spec`, `packaging/build.py`) so teammates don't
+need a Python toolchain. Internally uvicorn runs on an ephemeral
 localhost port in a daemon thread; the window points at it. A
 `--no-window` flag drops back to a blocking server for CI / remote
 dev. Three panes (pinned rail + day timeline; center cards; right

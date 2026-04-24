@@ -50,8 +50,10 @@ the Copilot SDK. Read `CLAUDE.md` for the full design doc.
   `pipelines/standup/` (Level 0) and `pipelines/incident-triage/`
   (Level 1, generator + evaluator + correction loop)
 - `crew/gui/` — optional desktop GUI (`[gui]` extra), launched via
-  `crew gui`. FastAPI + Jinja2 + HTMX + vanilla CSS inside a PyWebView
-  native window. `crew/gui/server.py` runs uvicorn on an ephemeral
+  `crew gui` or by running the PyInstaller-bundled app from
+  `packaging/` (see `packaging/README.md`). FastAPI + Jinja2 + HTMX +
+  vanilla CSS inside a PyWebView native window. `crew/gui/__main__.py`
+  is the bundle entrypoint (argparse-free; frozen by PyInstaller). `crew/gui/server.py` runs uvicorn on an ephemeral
   localhost port in a daemon thread and opens the window against that
   port; `--no-window` falls back to a blocking server for CI / remote
   dev. Three swappable design languages live under

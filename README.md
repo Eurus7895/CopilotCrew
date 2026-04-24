@@ -122,6 +122,25 @@ crew gui --no-window --open     # headless / CI / screencast: run the
                                 # the system browser
 ```
 
+### Ship as a clickable app
+
+Teammates shouldn't need a Python toolchain to run Crew. Package the
+GUI as a double-clickable bundle with PyInstaller:
+
+```bash
+pip install -e '.[gui,package]'
+python packaging/build.py
+```
+
+Outputs land in `dist/`:
+
+- `dist/Crew.app` — macOS bundle
+- `dist/Crew/Crew.exe` — Windows
+- `dist/Crew/Crew` — Linux
+
+See `packaging/README.md` for icons, code-signing, and a cross-platform
+GitHub Actions matrix.
+
 Three panes, three swappable design languages (tab strip at the top):
 
 - **Warm · Workspace** (default) — warm neutrals, paper cards, polaroid
