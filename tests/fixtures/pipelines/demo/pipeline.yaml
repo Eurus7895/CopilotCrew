@@ -1,0 +1,10 @@
+name: demo
+description: Fixture pipeline for registry tests.
+level: 0
+agent: agents/generator.md
+mcp:
+  - github
+  - nonexistent
+allowed_tools:
+  - read
+output_subdir: demo-out

@@ -1,0 +1,19 @@
+<form
+  class="warm-chat"
+  hx-post="/chat"
+  hx-target="#chat-log"
+  hx-swap="beforeend"
+  hx-on::after-request="this.querySelector('.warm-chat-input').value = ''"
+>
+  <span class="warm-chat-avatar" aria-hidden="true">{{ cfg.user_name[:1] | upper }}</span>
+  <input
+    type="text"
+    name="message"
+    class="warm-chat-input"
+    placeholder="Tell Crew about {{ (selected_event.label if selected_event else 'morning') | lower }}…"
+    aria-label="Message Crew"
+    autocomplete="off"
+    required
+  >
+  <button type="submit" class="warm-chat-send">Send &crarr;</button>
+</form>

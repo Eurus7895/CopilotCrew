@@ -1,0 +1,5 @@
+{"id": "morning", "kind": "morning", "label": "Morning", "time": "8:47 AM", "title": "Good morning", "lead": "Here's what happened overnight."}
+{"id": "nudge", "kind": "nudge", "label": "Proactive nudge", "time": "11:14 AM", "title": "Proactive nudge", "lead": "Worth checking before your next PR.", "body": "Day 2.8 skill dispatch changed the search order. Consider re-running /debug on the #47 branch before asking for review."}
+{"id": "pair", "kind": "pair", "label": "Pair programming", "time": "2:32 PM", "title": "Pair programming", "lead": "Co-pilot mode is live.", "body": "Session is resumable. Keep going — Crew is listening."}
+{"id": "meeting", "kind": "meeting", "label": "Meeting prep", "time": "3:45 PM", "title": "Meeting prep", "lead": "Your 1:1 with Priya in 15 min.", "body": "Last fact remembered: Priya prefers fail-closed evaluator. Topic you owe her: Day 3 scope."}
+{"id": "eod", "kind": "eod", "label": "End of day", "time": "6:02 PM", "title": "End of day", "lead": "Wrap review.", "body": "Shipped: Day 2.8 skill dispatch (#47). Open: Day 3 evaluator. Remaining: second reviewer on #47."}

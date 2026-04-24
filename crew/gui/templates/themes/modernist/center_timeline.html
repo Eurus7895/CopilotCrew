@@ -1,0 +1,29 @@
+<article class="mod-entry">
+  <div class="mod-entry-head">
+    <span class="mod-kicker">Filed as &middot; {{ selected_event.badge | default("Crew") }}</span>
+    <span class="mod-kicker mod-kicker-right">Entry &#8470; {{ "%02d" | format(loop_index_for(timeline, selected_event.id)) }}</span>
+  </div>
+
+  <div class="mod-numeral-row">
+    <div class="mod-numeral">{{ "%02d" | format(loop_index_for(timeline, selected_event.id)) }}<span class="mod-numeral-slash">/</span>0{{ timeline|length }}</div>
+    <div class="mod-numeral-meta">
+      <div class="mod-numeral-time">{{ selected_event.time }}</div>
+      <div class="mod-numeral-kind">{{ selected_event.label | upper }}</div>
+    </div>
+  </div>
+
+  <h2 class="mod-greeting">{{ selected_event.title | default(selected_event.label) }}<span class="mod-accent">.</span></h2>
+  {% if selected_event.lead %}
+    <p class="mod-lead"><span class="mod-lead-bar" aria-hidden="true"></span>{{ selected_event.lead }}</p>
+  {% endif %}
+
+  {% if selected_event.body %}
+    <section class="mod-section">
+      <header class="mod-section-head">
+        <span class="mod-section-marker">&sect;01</span>
+        <h3 class="mod-section-title">Log</h3>
+      </header>
+      <p class="mod-section-body">{{ selected_event.body }}</p>
+    </section>
+  {% endif %}
+</article>

@@ -1,0 +1,19 @@
+<section class="mod-section">
+  <header class="mod-section-head">
+    <span class="mod-section-marker">&sect;01</span>
+    <h3 class="mod-section-title">{{ prs|length }} PRs moved while you slept</h3>
+    <span class="mod-section-tag">digest</span>
+  </header>
+  {% if prs %}
+    <ul class="mod-list">
+      {% for pr in prs %}
+        <li>
+          <span class="mod-list-ref">{{ pr.repo | upper }}#{{ pr.number }}</span>
+          <span class="mod-list-body">{{ pr.status }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="mod-empty">No activity.</p>
+  {% endif %}
+</section>

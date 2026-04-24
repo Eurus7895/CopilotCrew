@@ -1,0 +1,16 @@
+name: ticket-refinement
+description: >
+  Refine a rough issue into a well-scoped ticket with a clear title,
+  context, acceptance criteria, and a risk note. Fits into the team's
+  "ready for sprint" bar.
+level: 1
+agent: agents/generator.md
+evaluator: agents/evaluator.md
+schema: schemas/refined-ticket.json
+mcp:
+  - github
+allowed_tools:
+  - read
+  - write
+  - mcp
+output_subdir: ticket-refinement
