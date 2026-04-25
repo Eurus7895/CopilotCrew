@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
-import io
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -67,10 +65,12 @@ def is_running() -> bool:
 
 
 async def run_generate(cfg: GUIConfig) -> None:
-    """Run the daily-standup pipeline with stdout redirected into the SSE bus.
+    """Run the daily-standup pipeline; stream deltas onto the SSE bus.
 
     Concurrency: guarded by a module-level lock. Raises ``AlreadyRunning``
-    if a run is already in flight.
+    if a run is already in flight. Uses a ``CallbackStreamer`` to publish
+    each assistant-message delta as a ``pipeline_progress`` event — the
+    ``#standup-progress`` strip in every theme listens for these.
     """
     if _run_lock.locked():
         raise AlreadyRunning("daily-standup pipeline already running")
@@ -83,6 +83,7 @@ async def run_generate(cfg: GUIConfig) -> None:
         # here is reported on the SSE bus, not at GUI boot.
         try:
             from crew import pipeline_registry, pipeline_runner
+            from crew.streamer import CallbackStreamer
         except ImportError as exc:
             await publish(
                 "pipeline_progress",
@@ -94,7 +95,6 @@ async def run_generate(cfg: GUIConfig) -> None:
             )
             return
 
-        sink = _QueueSink(pipeline_name=_PIPELINE_NAME)
         try:
             config = pipeline_registry.load_pipeline(_PIPELINE_NAME)
         except Exception as exc:
@@ -109,14 +109,28 @@ async def run_generate(cfg: GUIConfig) -> None:
             )
             return
 
+        loop = asyncio.get_event_loop()
+
+        def _on_delta(delta: str) -> None:
+            coro = publish(
+                "pipeline_progress",
+                {"pipeline": _PIPELINE_NAME, "state": "delta", "delta": delta},
+            )
+            try:
+                asyncio.ensure_future(coro, loop=loop)
+            except RuntimeError:
+                pass  # loop closed — drop
+
+        streamer = CallbackStreamer(on_delta_fn=_on_delta)
+
         try:
-            with contextlib.redirect_stdout(sink):
-                await pipeline_runner.run_pipeline(
-                    config,
-                    "Generate today's standup from recent GitHub activity.",
-                    model=cfg.model,
-                    crew_home=cfg.crew_home,
-                )
+            await pipeline_runner.run_pipeline(
+                config,
+                "Generate today's standup from recent GitHub activity.",
+                model=cfg.model,
+                crew_home=cfg.crew_home,
+                streamer=streamer,
+            )
         except Exception as exc:
             _log.exception("daily-standup pipeline failed")
             await publish(
@@ -128,8 +142,6 @@ async def run_generate(cfg: GUIConfig) -> None:
                 },
             )
             return
-        finally:
-            await sink.flush_remaining()
 
         draft = latest_draft(cfg)
         await publish(
@@ -144,50 +156,3 @@ async def run_generate(cfg: GUIConfig) -> None:
                     "path": str(draft.path),
                 },
             )
-
-
-class _QueueSink(io.TextIOBase):
-    """Write-side sink for ``contextlib.redirect_stdout``.
-
-    Buffers partial lines and fans complete lines out as
-    ``pipeline_progress`` SSE events. Safe to call from non-async code —
-    publish is scheduled onto the running event loop.
-    """
-
-    def __init__(self, *, pipeline_name: str) -> None:
-        super().__init__()
-        self._pipeline = pipeline_name
-        self._buf = ""
-        self._loop = asyncio.get_event_loop()
-
-    def writable(self) -> bool:
-        return True
-
-    def write(self, s: str) -> int:  # type: ignore[override]
-        if not s:
-            return 0
-        self._buf += s
-        while "\n" in self._buf:
-            line, _, self._buf = self._buf.partition("\n")
-            self._dispatch(line)
-        return len(s)
-
-    async def flush_remaining(self) -> None:
-        if self._buf:
-            tail, self._buf = self._buf, ""
-            await publish(
-                "pipeline_progress",
-                {"pipeline": self._pipeline, "state": "delta", "delta": tail},
-            )
-
-    def _dispatch(self, line: str) -> None:
-        coro = publish(
-            "pipeline_progress",
-            {"pipeline": self._pipeline, "state": "delta", "delta": line + "\n"},
-        )
-        try:
-            asyncio.ensure_future(coro, loop=self._loop)
-        except RuntimeError:
-            # Event loop closed — drop silently; run_generate's finally
-            # will re-raise the real cause.
-            pass
