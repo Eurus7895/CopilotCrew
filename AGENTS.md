@@ -54,9 +54,10 @@ the Copilot SDK. Read `CLAUDE.md` for the full design doc.
 - `skills/` — directory of skill bundles. Each skill is
   `skills/<name>/SKILL.md` plus optional `references/` and `scripts/`
   subdirectories. Currently: `skills/debug/`
-- `pipelines/` — self-contained pipeline directories;
-  `pipelines/standup/` (Level 0) and `pipelines/incident-triage/`
-  (Level 1, generator + evaluator + correction loop)
+- `pipelines/` — self-contained pipeline directories. v1 ships five:
+  `standup/` and `release-notes/` (Level 0); `incident-triage/`,
+  `ticket-refinement/`, and `code-review-routing/` (Level 1, each with
+  generator + evaluator + schema for the correction loop)
 
 ## Three modes + skill invocation
 
@@ -99,6 +100,13 @@ See CLAUDE.md "Agent Complexity Model" and "Phase 5 — Plugin Marketplace".
 
 ## Build status
 
+**Day 4-B pipelines shipped.** All five v1 pipelines are now in
+`pipelines/`: `standup` and `release-notes` (Level 0); `incident-triage`,
+`ticket-refinement`, and `code-review-routing` (Level 1 with isolated
+evaluator + correction loop). Each Level 1 pipeline has a JSON schema
+under `schemas/` that the evaluator grades against. The intent router
+discovers them automatically — no registry edits needed.
+
 **Day 4-B streamer shipped.** `crew/streamer.py` consolidates the
 previously-duplicated `on_event` handler into one `Streamer` class with
 three modes (`verbose` / `summary` / `silent`). `crew --pipeline
@@ -121,6 +129,7 @@ Earlier days, in order: Day 2 (pipeline runner + hooks +
 `daily-standup`), Day 2.5 (3-way router + `agents/` directory), Day 2.8
 (slash commands invoke skills; `skills/debug/`), Day 3 (Level 1 pipelines
 with isolated evaluator + correction loop; `incident-triage`), `/help`
-(zero-LLM registry listing). Remaining Day 4-B work: ticket-refinement,
-code-review-routing, and release-notes pipelines, plus subagent
-spawning.
+(zero-LLM registry listing). Day 4-B's remaining open item is the
+end-to-end shakedown of all five pipelines on real team data — that
+needs live MCP credentials + a real repo and folds naturally into the
+Day 5 first-team-member rollout.

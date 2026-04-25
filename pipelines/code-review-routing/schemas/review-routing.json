@@ -1,0 +1,33 @@
+{
+  "required_sections": [
+    "PR Summary",
+    "Recommended Reviewers",
+    "Coverage Notes"
+  ],
+  "rules": [
+    {
+      "check": "every_reviewer_has_rationale",
+      "message": "Every entry under '## Recommended Reviewers' MUST cite at least one of: a CODEOWNERS rule (with file glob and matching changed file) OR a PR number the reviewer authored or reviewed against a changed file."
+    },
+    {
+      "check": "exclude_pr_author_and_bots",
+      "message": "The PR author MUST NOT appear in '## Recommended Reviewers'. Bot handles (anything ending in '[bot]') MUST NOT appear either."
+    },
+    {
+      "check": "coverage_notes_explicit",
+      "message": "'## Coverage Notes' MUST list any changed file with no matching CODEOWNERS rule AND no recent PR author. If every file is covered, it MUST contain the explicit 'All changed files have at least one recommended reviewer.' bullet."
+    },
+    {
+      "check": "reviewer_count_in_range",
+      "message": "Recommend at most 5 reviewers and at least 1 if any CODEOWNERS rule or recent PR author was found. If no reviewers can be recommended, '## Recommended Reviewers' MUST say so explicitly."
+    },
+    {
+      "check": "no_invented_activity",
+      "message": "If a GitHub MCP call returned no results, the output MUST say so explicitly. The generator MUST NOT fabricate handles, file globs, or PR numbers."
+    },
+    {
+      "check": "output_is_short",
+      "message": "The whole document MUST stay under 350 words."
+    }
+  ]
+}

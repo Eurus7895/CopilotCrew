@@ -1,0 +1,17 @@
+name: ticket-refinement
+description: >
+  Refine a thin GitHub issue into a well-structured ticket with summary,
+  user story, acceptance criteria, technical notes, and a rough effort
+  estimate. Level 1 pipeline — graded by an isolated evaluator and
+  retried with fix instructions on failure.
+level: 1
+agent: agents/generator.md
+evaluator: agents/evaluator.md
+schema: schemas/refined-ticket.json
+mcp:
+  - github
+allowed_tools:
+  - read
+  - write
+  - mcp
+output_subdir: ticket-refinement

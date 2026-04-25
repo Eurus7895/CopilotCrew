@@ -648,7 +648,7 @@ Implementation notes:
 ### Day 4-B — Streaming + remaining pipelines
 ```
 [x] streamer.py: terminal output + summary mode
-[ ] ticket-refinement, code-review-routing, release-notes
+[x] ticket-refinement, code-review-routing, release-notes
 [ ] Test all 5 pipelines end-to-end on real team data
 ```
 
@@ -668,6 +668,22 @@ Implementation notes:
   generated output file is identical in both modes — `--summary` only
   changes what lands on the terminal, so cron / CI invocations can
   keep logs readable without giving up the audit trail.
+* Three new pipelines complete the v1 set of five:
+  * `release-notes` (Level 0) — drafts release notes from merged PRs
+    between two refs, bucketed Highlights / Features / Fixes /
+    Internal-Chores / Contributors.
+  * `ticket-refinement` (Level 1) — refines a thin GitHub issue into a
+    structured draft (Title / Summary / User Story / AC / Technical
+    Notes / Effort / Stakeholders / Open Questions). Evaluator's
+    hardest-to-fake rule is `ac_is_user_facing` — AC items must read as
+    user-observable behaviour, not implementation bullets.
+  * `code-review-routing` (Level 1) — recommends ranked reviewers for
+    an open PR, citing CODEOWNERS rules or recent PR authorship as
+    rationale per reviewer; excludes PR author + bots.
+* End-to-end tests on real team data — the third Day 4-B item — stay
+  open. Each pipeline ships with discovery + load coverage in the
+  unit tests, but the full generator/evaluator loop against live
+  GitHub MCP is a Day 5 / first-team-member exercise.
 
 ### Day 5 — Hardening + first team member
 ```
@@ -784,6 +800,6 @@ architecture primitives, different execution model.
 
 *Updated: April 2026*
 *Product: Crew*
-*Phase: Day 4-B streamer shipped; remaining pipelines next*
+*Phase: Day 4-B all five pipelines shipped; live-data shakedown next*
 *First user: Current team*
-*Next: Day 4-B — ticket-refinement, code-review-routing, release-notes pipelines*
+*Next: end-to-end run of all five pipelines on real team data, then Day 5*
