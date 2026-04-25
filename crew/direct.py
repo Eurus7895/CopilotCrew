@@ -87,15 +87,22 @@ async def run_direct(
     skill_prompt: str | None = None,
     history_prompt: str | None = None,
     session_id: str | None = None,
+    streamer: Streamer | None = None,
 ) -> DirectResult:
-    """Send `user_input` and stream the reply to stdout.
+    """Send `user_input` and stream the reply through ``streamer``.
+
+    Default streamer :class:`crew.streamer.TerminalStreamer` prints
+    deltas to stdout (legacy CLI behaviour). The GUI's ``/chat`` route
+    passes a :class:`crew.streamer.CallbackStreamer` that publishes each
+    delta onto the SSE bus instead.
 
     Returns a ``DirectResult(session_id, assistant_text)`` so the caller
     can persist the conversation. ``session_id`` (in) resumes an existing
     Copilot session; ``DirectResult.session_id`` (out) is what to remember
     for the next turn (it may differ if the SDK assigned a new id).
     """
-    streamer = Streamer(mode="verbose")
+    if streamer is None:
+        streamer = Streamer(mode="verbose")
 
     session_kwargs: dict[str, Any] = {
         "on_permission_request": PermissionHandler.approve_all,

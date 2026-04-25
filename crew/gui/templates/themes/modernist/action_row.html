@@ -1,0 +1,8 @@
+<div class="mod-actions">
+  <button type="button" class="mod-btn mod-btn-primary" disabled
+          title="Slack integration coming in Phase 8">Post to #standup</button>
+  <button type="button" class="mod-btn" hx-post="/standup/edit" hx-swap="none">Edit draft</button>
+  <button type="button" class="mod-btn" hx-post="/standup/skip"
+          hx-target="#card-standup" hx-swap="outerHTML">Skip today</button>
+  <button type="button" class="mod-btn mod-btn-ghost" hx-post="/standup/run" hx-swap="none">Regenerate</button>
+</div>

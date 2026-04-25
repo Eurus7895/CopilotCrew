@@ -1,0 +1,34 @@
+<aside class="term-rail term-right">
+  <section class="term-section">
+    <div class="term-path">~/CONTEXT</div>
+    <table class="term-kv">
+      <tr><td>repo</td><td>CopilotCrew/dev</td></tr>
+      <tr><td>branch</td><td>day3-evaluator</td></tr>
+      <tr><td>phase</td><td>2.8 &rarr; 3</td></tr>
+    </table>
+  </section>
+
+  <section class="term-section">
+    <div class="term-path">~/MEMORY.JSONL</div>
+    <ul class="term-memory">
+      {% for fact in facts %}
+        <li>&middot; {{ fact.fact }}</li>
+      {% else %}
+        <li class="term-empty">no memory</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="term-section">
+    <div class="term-path">~/TIMELINE</div>
+    <ul class="term-timeline">
+      {% for event in timeline %}
+        <li class="{% if selected_event and selected_event.id == event.id %}selected{% endif %}">
+          <span class="term-timeline-time">{{ event.time | lower | replace(" am", "am") | replace(" pm", "pm") }}</span>
+          <span class="term-timeline-mark">{% if selected_event and selected_event.id == event.id %}&rsaquo;{% else %}&middot;{% endif %}</span>
+          <span class="term-timeline-label">{{ event.label }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+</aside>

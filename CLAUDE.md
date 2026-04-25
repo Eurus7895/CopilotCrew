@@ -511,6 +511,12 @@ agent loader.
     config.yaml                  auth, model, output preferences
     sessions.json                per-scope Copilot session_id cache (Day 4-A)
     conversations/<scope>.jsonl  per-scope turn log (audit trail; Day 4-A)
+    memory.jsonl                 remembered facts for the GUI right rail
+                                 (Phase 7; hooks + future pipelines append)
+    gui/                         JSONL stubs the dashboard reads for
+                                 timeline, PR activity, Slack mentions,
+                                 working-on chips (Phase 7; seeded on
+                                 first `crew gui` run)
 ```
 
 Env vars affecting state:
@@ -647,7 +653,7 @@ Implementation notes:
 
 ### Day 4-B — Streaming + remaining pipelines
 ```
-[x] streamer.py: terminal output + summary mode
+[x] streamer.py: terminal output + summary mode + GUI callback strategy
 [x] ticket-refinement, code-review-routing, release-notes
 ```
 
@@ -659,14 +665,21 @@ Implementation notes:
   `verbose` (stream tokens to stdout — direct / agent / slash),
   `summary` (terse status lines: generating / tool / done N chars —
   pipelines under `--summary`), `silent` (capture-only — evaluator
-  + router). Tool-execution events fan out to optional
+  + router + GUI). Tool-execution events fan out to optional
   `on_tool_start` / `on_tool_end` callbacks so the pipeline runner
   can keep firing `pre-tool-use` / `post-tool-use` hooks without
-  re-implementing the event-type dispatch.
+  re-implementing the event-type dispatch. Per-delta callbacks fire
+  through the optional `on_delta` field — used by the GUI's
+  `CallbackStreamer` (a named-constructor subclass) to publish each
+  token onto the SSE bus.
 * `crew --pipeline --summary "…"` is the user-facing flag. The
   generated output file is identical in both modes — `--summary` only
   changes what lands on the terminal, so cron / CI invocations can
   keep logs readable without giving up the audit trail.
+* Both `crew.direct.run_direct` and `crew.pipeline_runner.run_pipeline`
+  accept an optional `streamer=` kwarg. The GUI passes a
+  `CallbackStreamer(on_delta_fn=...)` so chat tokens and pipeline
+  progress flow over the existing SSE bus instead of stdout.
 * Three new pipelines complete the v1 set of five:
   * `release-notes` (Level 0) — drafts release notes from merged PRs
     between two refs, bucketed Highlights / Features / Fixes /
@@ -683,6 +696,22 @@ Implementation notes:
   Day 5 — it needs live MCP credentials and a real team repo, and
   folds naturally into the first-team-member rollout. Each pipeline
   ships with discovery + load coverage in the unit-test suite.
+
+### Day 4-C — GUI interactivity (shipped)
+```
+[x] POST /chat route bridging to crew.direct.run_direct, reusing the
+    per-scope session cache via crew.conversations; tokens stream
+    over the SSE bus as chat_token events
+[x] Per-theme chat_turn.html + message-bubble area + composer wiring
+    (Warm paper bubbles, Terminal crew>/you> grid, Modernist editorial
+    entries under §-rule)
+[x] Clickable pinned items: POST /pinned/{kind}/{name} dispatches
+    skills (append skill_prompt), agents (swap agent_prompt),
+    pipelines (kick off a run), plus POST /pinned/memory → $EDITOR
+[x] Visible regenerate stream in the standup card (#standup-progress
+    strip listens to pipeline_progress SSE; no backend change)
+```
+See Phase 7 "Next — interactivity" for the full spec.
 
 ### Day 5 — Hardening + first team member
 ```
@@ -726,8 +755,67 @@ format (see Phase 2). No migration.
 ### Phase 6 — SSO / Enterprise Auth (Month 4+)
 Only after team adoption proven.
 
-### Phase 7 — Web Dashboard (Month 6+)
-Read-only view of logs.db + plans/. FastAPI + HTMX. CLI remains primary.
+### Phase 7 — Desktop GUI (shipped alongside Day 4-A)
+FastAPI + Jinja2 + HTMX + vanilla CSS wrapped in a PyWebView native
+window. Optional `[gui]` extra; launched via `crew gui` — no browser
+and no user-visible server. Distributable as a double-clickable
+`.app` / `.exe` / AppImage via PyInstaller (`[package]` extra,
+`packaging/crew_gui.spec`, `packaging/build.py`) so teammates don't
+need a Python toolchain. Internally uvicorn runs on an ephemeral
+localhost port in a daemon thread; the window points at it. A
+`--no-window` flag drops back to a blocking server for CI / remote
+dev. Three panes (pinned rail + day timeline; center cards; right
+rail context) rendered in three swappable design languages —
+**Warm · Workspace** (warm neutrals, paper cards, polaroid avatar),
+**Terminal · Operator** (tmux amber-on-black, ASCII rules, vim hints,
+`crew>` prompt), and **Modernist · Swiss** (Archivo + signal-red,
+giant numerals, §NN markers, "BY THE NUMBERS" stats rail). Theme
+picked from `?theme=` query (sets a `crew_theme` cookie), cookie, or
+default (warm). Live data: pinned rail + standup draft from
+`~/.crew/outputs/daily-standup/`. Stub JSONL data:
+`~/.crew/gui/{timeline,pr_activity,slack_mentions,working_on}.jsonl`
+and `~/.crew/memory.jsonl`, seeded on first run so future
+hooks/pipelines can append without GUI changes. Regenerate re-runs
+the `daily-standup` pipeline with stdout captured into an SSE bus; a
+module-level lock blocks concurrent runs. Theme picker lives at
+`/settings` (cookie-persisted). "Post to #standup" is wired only to
+the UI — Slack integration is deferred. CLI remains primary.
+
+**Interactivity — shipped (Day 4-C).** The GUI is no longer read-only:
+the mockup's chat input and pinned items now dispatch to real Crew
+primitives, and the standup regenerate stream is visible live in each
+theme. Three increments, all reusing the existing SSE bus +
+`crew.streamer.CallbackStreamer`:
+
+1. **Chat input.** The theme-specific input strip ("Tell Crew about
+   morning…" in Warm, `crew>` in Terminal, a bottom composer in
+   Modernist) becomes a working conversation channel. A new
+   `POST /chat` route bridges to `crew.direct.run_direct`, reusing the
+   per-scope session cache from `crew/conversations.py`; tokens stream
+   over the existing SSE bus; each theme renders a message-bubble
+   area below the greeting. Turn rotation respects `CREW_TURN_CAP`
+   exactly like the CLI. Pipelines + the evaluator still never resume
+   (principle #2). This is what turns Crew from a dashboard into a
+   coworker.
+
+2. **Clickable pinned items.** Left-rail entries gain handlers:
+   slash-commands (`/debug`) fire the skill as a direct call,
+   `agent:coder` opens a fresh chat with the persona active (routes
+   through `crew.direct` with `agent_prompt`), pipelines (`/standup`)
+   kick off a run gated by the existing concurrency lock,
+   `memory.jsonl` opens the facts file in `$EDITOR`. Reuses the
+   standup `/standup/run` pattern end-to-end.
+
+3. **Visible regenerate stream.** The standup card gets a
+   collapsible progress strip that listens to the `pipeline_progress`
+   SSE events and prints deltas as they arrive — matches the Terminal
+   theme's log aesthetic and gives Warm/Modernist a live-typing
+   indicator. No backend changes; the bus already publishes these.
+
+All three keep the themes in lockstep — the backend is
+theme-agnostic; only the bubble / progress-strip markup is
+per-theme. "Post to #standup" stays disabled until Phase 8 adds
+Slack.
 
 ---
 
@@ -779,10 +867,13 @@ architecture primitives, different execution model.
 ```
 ❌ Level 2 pipelines         ❌ Pipeline marketplace
 ❌ Auto-invoke skills        ❌ Executable hooks (beyond Python scripts)
-❌ Web dashboard             ❌ SSO / enterprise auth
-❌ Cloud deployment          ❌ Multi-user sessions
-❌ More than 5 pipelines     ❌ context_budget enforcement
+❌ SSO / enterprise auth     ❌ Cloud deployment
+❌ Multi-user sessions       ❌ More than 5 pipelines
+❌ context_budget enforcement
 ```
+
+Note: the local web dashboard was originally listed here as "not in v1"
+but shipped alongside Day 4-A. See **Phase 7 — Web Dashboard** above.
 
 ---
 
@@ -800,8 +891,8 @@ architecture primitives, different execution model.
 
 *Updated: April 2026*
 *Product: Crew*
-*Phase: Day 4 complete (4-A + 4-B); Day 5 hardening next*
+*Phase: Day 4 complete (4-A + 4-B + 4-C); Day 5 hardening next*
 *First user: Current team*
 *Next: Day 5 — baseline session-start checks, `crew logs/status/resume`,
-README, end-to-end shakedown of all five pipelines on real team data,
-hand to first team member*
+README polish, end-to-end shakedown of all five pipelines on real team
+data, hand to first team member*

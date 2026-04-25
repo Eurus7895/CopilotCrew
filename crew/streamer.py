@@ -21,7 +21,8 @@ Three modes:
   on the user's terminal.
 * ``silent`` — capture-only, no stdout output. Used by the evaluator and
   the intent router, both of which collect a structured reply they parse
-  downstream.
+  downstream. Also used by the GUI's chat bridge, which surfaces deltas
+  via an ``on_delta`` callback rather than stdout.
 
 Usage::
 
@@ -33,6 +34,11 @@ Usage::
 ``finish()`` is idempotent and returns the accumulated assistant text.
 Callers that only need the text (not the trailing-newline side effect)
 may read ``streamer.text`` directly.
+
+The convenience subclasses :class:`TerminalStreamer`,
+:class:`SummaryStreamer`, and :class:`CallbackStreamer` provide named
+constructors for the common cases — particularly the GUI's SSE chat
+bridge, which constructs ``CallbackStreamer(on_delta_fn=...)``.
 """
 
 from __future__ import annotations
@@ -46,6 +52,7 @@ from copilot.generated.session_events import SessionEvent, SessionEventType
 StreamMode = Literal["verbose", "summary", "silent"]
 
 ToolEventCb = Callable[[SessionEvent], None]
+DeltaCb = Callable[[str], None]
 
 # The installed Copilot SDK may not expose tool-execution events. Resolve
 # the enum members once at import time and treat their absence as a
@@ -79,12 +86,18 @@ class Streamer:
     invoked AFTER the streamer's own summary-mode bookkeeping, so a
     hook that writes to stdout won't interleave with a half-emitted
     summary line.
+
+    ``on_delta`` is fired (when set) for every assistant-message delta,
+    independent of ``mode``. The GUI's SSE chat bridge uses this to
+    publish per-token events onto the events bus while keeping
+    ``mode="silent"`` (no stdout writes).
     """
 
     mode: StreamMode = "verbose"
     label: str = ""
     on_tool_start: ToolEventCb | None = None
     on_tool_end: ToolEventCb | None = None
+    on_delta: DeltaCb | None = None
     stream: TextIO | None = None
 
     _buffer: list[str] = field(default_factory=list, init=False, repr=False)
@@ -100,6 +113,8 @@ class Streamer:
             if delta:
                 self._buffer.append(delta)
                 self._on_delta(delta)
+                if self.on_delta is not None:
+                    self.on_delta(delta)
             return
         if _TOOL_USE_START is not None and etype == _TOOL_USE_START:
             self._on_tool_start(event)
@@ -111,6 +126,9 @@ class Streamer:
             if self.on_tool_end is not None:
                 self.on_tool_end(event)
             return
+
+    # GUI-style alias kept for callers that imported the older API.
+    handle_event = handler
 
     @property
     def text(self) -> str:
@@ -134,6 +152,10 @@ class Streamer:
                 out.write(f"{prefix}done ({len(self.text)} chars)\n")
                 out.flush()
         return self.text
+
+    # GUI-style alias for callers that previously called ``finish_line()``.
+    def finish_line(self) -> str:
+        return self.finish()
 
     # ── internals ───────────────────────────────────────────────────────
 
@@ -165,3 +187,54 @@ class Streamer:
         # No per-tool footer in summary mode — the next event
         # (assistant delta or another tool) makes progress obvious.
         return None
+
+
+# ── named-constructor subclasses ─────────────────────────────────────────
+#
+# These exist so callers can express intent at the construction site
+# (``CallbackStreamer(on_delta_fn=...)`` reads better than ``Streamer(
+# mode="silent", on_delta=...)``) and so the GUI's existing imports keep
+# working unchanged after the dev/gui-branch reconciliation.
+
+
+@dataclass
+class TerminalStreamer(Streamer):
+    """Default CLI streamer: write deltas to stdout as they arrive."""
+
+    mode: StreamMode = "verbose"
+
+
+@dataclass
+class SummaryStreamer(Streamer):
+    """Capture-only streamer with no stdout writes.
+
+    Suitable for tests and CI runs that want the full text after the
+    turn completes but no token-level noise. Despite the name, this is
+    the ``mode="silent"`` variant — the pipeline-runner's "summary"
+    output (terse status lines per phase) is still produced by
+    ``Streamer(mode="summary")``.
+    """
+
+    mode: StreamMode = "silent"
+
+
+class CallbackStreamer(Streamer):
+    """Forward each delta to an injected callback. Used by the GUI."""
+
+    def __init__(
+        self,
+        *,
+        on_delta_fn: DeltaCb | None = None,
+        label: str = "",
+        on_tool_start: ToolEventCb | None = None,
+        on_tool_end: ToolEventCb | None = None,
+        stream: TextIO | None = None,
+    ) -> None:
+        super().__init__(
+            mode="silent",
+            label=label,
+            on_tool_start=on_tool_start,
+            on_tool_end=on_tool_end,
+            on_delta=on_delta_fn,
+            stream=stream,
+        )

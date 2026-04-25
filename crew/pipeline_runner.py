@@ -86,6 +86,7 @@ async def _run_generator(
     stream_mode: StreamMode,
     streamer_label: str = "",
     fix_instructions: list[str] | None = None,
+    streamer: Streamer | None = None,
 ) -> tuple[str, str, str]:
     """Run one generator turn. Returns (output_text, started_at, finished_at).
 
@@ -94,6 +95,12 @@ async def _run_generator(
     the next attempt sees the evaluator's feedback. The system message is
     always ``config.agent_prompt`` — the generator restarts with a fresh
     session per attempt (no carry-over context).
+
+    When ``streamer`` is provided (the GUI's ``CallbackStreamer`` for
+    SSE-driven progress), it's used in place of the internal default and
+    the ``stream_mode`` / ``streamer_label`` arguments are ignored. Either
+    way, the pre-/post-tool-use hook callbacks are attached to the
+    streamer in use, so hooks fire identically for CLI and GUI runs.
     """
 
     def _on_tool_start(event: SessionEvent) -> None:
@@ -112,12 +119,16 @@ async def _run_generator(
             event=event,
         )
 
-    streamer = Streamer(
-        mode=stream_mode,
-        label=streamer_label,
-        on_tool_start=_on_tool_start,
-        on_tool_end=_on_tool_end,
-    )
+    if streamer is None:
+        streamer = Streamer(
+            mode=stream_mode,
+            label=streamer_label,
+            on_tool_start=_on_tool_start,
+            on_tool_end=_on_tool_end,
+        )
+    else:
+        streamer.on_tool_start = _on_tool_start
+        streamer.on_tool_end = _on_tool_end
 
     prompt = user_input
     if fix_instructions:
@@ -151,6 +162,7 @@ async def run_level_0(
     crew_home: Path | None = None,
     route_result: dict[str, Any] | None = None,
     stream_mode: StreamMode = "verbose",
+    streamer: Streamer | None = None,
 ) -> RunResult:
     if config.level != 0:
         raise ValueError(
@@ -184,6 +196,7 @@ async def run_level_0(
         model=model,
         stream_mode=stream_mode,
         streamer_label=config.name if stream_mode == "summary" else "",
+        streamer=streamer,
     )
     output_path.write_text(output_text, encoding="utf-8")
 
@@ -224,6 +237,7 @@ async def run_level_1(
     route_result: dict[str, Any] | None = None,
     max_retries: int = 3,
     stream_mode: StreamMode = "verbose",
+    streamer: Streamer | None = None,
 ) -> RunResult:
     if config.level != 1:
         raise ValueError(
@@ -278,6 +292,7 @@ async def run_level_1(
             stream_mode=stream_mode,
             streamer_label=label,
             fix_instructions=last_fix_instructions,
+            streamer=streamer,
         )
         attempt_output_path = (
             outputs_dir / f"{run_stamp}-{run_uid}-attempt{attempt}.md"
@@ -375,6 +390,7 @@ async def run_pipeline(
     route_result: dict[str, Any] | None = None,
     max_retries: int = 3,
     stream_mode: StreamMode = "verbose",
+    streamer: Streamer | None = None,
 ) -> RunResult:
     """Dispatch by ``config.level``.
 
@@ -390,6 +406,7 @@ async def run_pipeline(
             crew_home=crew_home,
             route_result=route_result,
             stream_mode=stream_mode,
+            streamer=streamer,
         )
     if config.level == 1:
         return await run_level_1(
@@ -401,6 +418,7 @@ async def run_pipeline(
             route_result=route_result,
             max_retries=max_retries,
             stream_mode=stream_mode,
+            streamer=streamer,
         )
     raise ValueError(
         f"Level {config.level} not supported in v1 (Level 2 is gated on "

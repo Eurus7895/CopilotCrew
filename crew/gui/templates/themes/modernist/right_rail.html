@@ -1,0 +1,35 @@
+<aside class="mod-rail mod-right">
+  <div class="mod-kicker">By the numbers</div>
+  <h3 class="mod-numbers-heading">The day, measured.</h3>
+
+  <dl class="mod-numbers">
+    <div class="mod-number-row">
+      <dt>Open PRs</dt>
+      <dd>{{ "%02d" | format(prs|length) }}</dd>
+    </div>
+    <div class="mod-number-row">
+      <dt>Mentions today</dt>
+      <dd>{{ "%02d" | format(mentions|length) }}</dd>
+    </div>
+    <div class="mod-number-row mod-number-accent">
+      <dt>Flaky tests</dt>
+      <dd>01</dd>
+    </div>
+    <div class="mod-number-row">
+      <dt>Context tokens</dt>
+      <dd>12.4k</dd>
+    </div>
+  </dl>
+
+  <div class="mod-kicker mod-kicker-spaced">Observations</div>
+  <div class="mod-observations">
+    {% for fact in facts %}
+      <section class="mod-obs">
+        <div class="mod-obs-label">{{ loop.index0 | mod_obs_label(fact) }}</div>
+        <p class="mod-obs-body">{{ fact.fact }}</p>
+      </section>
+    {% else %}
+      <p class="mod-empty">No observations recorded.</p>
+    {% endfor %}
+  </div>
+</aside>

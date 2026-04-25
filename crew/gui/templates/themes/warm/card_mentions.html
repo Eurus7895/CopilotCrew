@@ -1,0 +1,18 @@
+<section class="warm-card">
+  <header class="warm-card-head">
+    <h3>{{ mentions|length }} mention{{ "s" if mentions|length != 1 else "" }} in Slack</h3>
+    <span class="warm-card-tag">digest</span>
+  </header>
+  {% if mentions %}
+    <ul class="warm-list">
+      {% for m in mentions %}
+        <li>
+          <code class="warm-ref">{{ m.channel }}</code>
+          <span class="warm-list-body">{{ m.snippet }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="warm-empty-text">No mentions yet.</p>
+  {% endif %}
+</section>

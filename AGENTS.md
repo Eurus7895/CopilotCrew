@@ -58,6 +58,31 @@ the Copilot SDK. Read `CLAUDE.md` for the full design doc.
   `standup/` and `release-notes/` (Level 0); `incident-triage/`,
   `ticket-refinement/`, and `code-review-routing/` (Level 1, each with
   generator + evaluator + schema for the correction loop)
+- `crew/gui/` — optional desktop GUI (`[gui]` extra), launched via
+  `crew gui` or by running the PyInstaller-bundled app from
+  `packaging/` (see `packaging/README.md`). FastAPI + Jinja2 + HTMX +
+  vanilla CSS inside a PyWebView native window. `crew/gui/__main__.py`
+  is the bundle entrypoint (argparse-free; frozen by PyInstaller).
+  `crew/gui/server.py` runs uvicorn on an ephemeral localhost port in a
+  daemon thread and opens the window against that port; `--no-window`
+  falls back to a blocking server for CI / remote dev. Three swappable
+  design languages live under
+  `crew/gui/templates/themes/{warm,terminal,modernist}/` + matching
+  `crew/gui/static/themes/<name>.css`; the theme resolver in
+  `crew/gui/routes/_shared.py` picks one from `?theme=` query (sets a
+  cookie) / the `crew_theme` cookie / default (`warm`). Bridge logic in
+  `crew/gui/services/` (`chat_service`, `pinned`, `pinned_actions`,
+  `mocks`, `standup_service`, `status_service`, `editor`, `events_bus`,
+  `bootstrap`). Pinned rail and the standup card are live over real
+  registries + `~/.crew/outputs/daily-standup/`; timeline, facts,
+  PR/Slack cards, and working-on chips read JSONL stubs seeded into
+  `~/.crew/gui/` and `~/.crew/memory.jsonl`. Chat reuses
+  `crew.direct.run_direct` via a `CallbackStreamer` that publishes
+  per-token events onto the SSE bus; pipeline invocation reuses
+  `pipeline_runner.run_pipeline` (a module lock blocks concurrent
+  runs). Copilot SDK imports inside `chat_service` and
+  `standup_service` are lazy so the GUI boots even without the SDK for
+  read-only use
 
 ## Three modes + skill invocation
 
@@ -100,23 +125,10 @@ See CLAUDE.md "Agent Complexity Model" and "Phase 5 — Plugin Marketplace".
 
 ## Build status
 
-**Day 4 complete (4-A + 4-B).** Crew now has bounded session
-continuity for chatty modes, a unified streamer, and the full v1 set
-of five pipelines.
+**Day 4 complete (4-A + 4-B + 4-C).** Crew now has bounded session
+continuity for chatty modes, a unified streamer, the full v1 set of
+five pipelines, and an interactive desktop GUI.
 
-* **Day 4-B pipelines.** All five v1 pipelines are in `pipelines/`:
-  `standup` and `release-notes` (Level 0); `incident-triage`,
-  `ticket-refinement`, and `code-review-routing` (Level 1 with isolated
-  evaluator + correction loop). Each Level 1 pipeline has a JSON schema
-  under `schemas/` that the evaluator grades against. The intent router
-  discovers them automatically — no registry edits needed.
-* **Day 4-B streamer.** `crew/streamer.py` consolidates the
-  previously-duplicated `on_event` handler into one `Streamer` class
-  with three modes (`verbose` / `summary` / `silent`). `crew
-  --pipeline --summary "…"` replaces token-by-token streaming with
-  terse status lines (generator start, per-tool call, final char
-  count) for cron / CI / log-file invocations — the pipeline's output
-  file is identical either way.
 * **Day 4-A.** Bounded session continuity for chatty modes:
   `crew/conversations.py` persists the per-scope Copilot `session_id`
   in `~/.crew/sessions.json` and appends every turn to a
@@ -127,6 +139,37 @@ of five pipelines.
   `--new` to force fresh. Pipelines + the evaluator stay one-shot —
   guarded by runtime tests asserting no `session_id` is ever passed
   to `create_session` from the runner.
+* **Day 4-B pipelines.** All five v1 pipelines are in `pipelines/`:
+  `standup` and `release-notes` (Level 0); `incident-triage`,
+  `ticket-refinement`, and `code-review-routing` (Level 1 with isolated
+  evaluator + correction loop). Each Level 1 pipeline has a JSON schema
+  under `schemas/` that the evaluator grades against. The intent router
+  discovers them automatically — no registry edits needed.
+* **Day 4-B streamer.** `crew/streamer.py` consolidates the
+  previously-duplicated `on_event` handler into one `Streamer` class
+  with three modes (`verbose` / `summary` / `silent`) plus named
+  subclasses (`TerminalStreamer`, `SummaryStreamer`, `CallbackStreamer`).
+  `crew --pipeline --summary "…"` replaces token-by-token streaming
+  with terse status lines (generator start, per-tool call, final char
+  count) for cron / CI / log-file invocations — the pipeline's output
+  file is identical either way. The GUI uses `CallbackStreamer` to
+  fan deltas onto the SSE bus.
+* **Day 4-C GUI.** `crew gui` opens a native PyWebView window
+  (three-pane "always-open" layout: left rail pinned items + day
+  timeline, center cards + standup draft, right rail memory/facts) in
+  one of three swappable design languages — Warm · Workspace,
+  Terminal · Operator, or Modernist · Swiss — selectable from
+  `/settings` (cookie-persisted). `POST /chat` bridges to
+  `crew.direct.run_direct` with a `CallbackStreamer` that publishes
+  `chat_token` / `chat_done` / `chat_error` events over the SSE bus;
+  per-theme `chat_turn.html` fragments render user + assistant bubbles
+  that fill in live. Pinned items are real buttons hitting
+  `POST /pinned/{kind}/{name}` — skills append to direct mode, agents
+  swap the persona, pipelines kick off a run (daily-standup shares the
+  regenerate lock), and the `memory.jsonl` pin opens the file in
+  `$EDITOR`. The standup card gained a `#standup-progress` strip that
+  streams `pipeline_progress` deltas as Crew writes them. CLI remains
+  primary; the GUI is an optional `[gui]` extra.
 
 Earlier days, in order: Day 2 (pipeline runner + hooks +
 `daily-standup`), Day 2.5 (3-way router + `agents/` directory),

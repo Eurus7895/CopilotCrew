@@ -1,0 +1,16 @@
+<section class="term-card term-standup" id="card-standup">
+  <div class="term-rule">&mdash; draft &lt;&lt;EOF &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</div>
+  <div class="term-standup-head">
+    <span class="term-standup-title">DRAFT STANDUP</span>
+    <span class="term-standup-hint">:WQ TO SEND</span>
+  </div>
+  {% if draft.body %}
+    <pre class="term-standup-body">{{ draft.body }}</pre>
+  {% else %}
+    <p class="term-empty">&gt; no draft &mdash; run :regen</p>
+  {% endif %}
+  <div class="standup-progress term-standup-progress" id="standup-progress" hidden>
+    <div class="standup-progress-head">&gt; pipeline:daily-standup &mdash; streaming &middot;</div>
+    <pre class="standup-progress-body"></pre>
+  </div>
+</section>

@@ -1,0 +1,13 @@
+<section class="term-card">
+  <div class="term-rule">&mdash; 01 &middot; {{ prs|length }} PRS MOVED WHILE YOU SLEPT &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</div>
+  {% if prs %}
+    {% for pr in prs %}
+      <div class="term-row">
+        <span class="term-ref">[{{ pr.repo }}#{{ pr.number }}]</span>
+        <span class="term-row-body">{{ pr.status }}</span>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="term-row term-empty">&gt; no pr activity</div>
+  {% endif %}
+</section>
