@@ -1,8 +1,8 @@
 name: release-notes
 description: >
-  Compose release notes from PRs merged since the last tag. Groups by
-  "Features / Fixes / Internal", credits authors, and highlights any
-  breaking changes.
+  Draft release notes from merged pull requests between two refs (defaults
+  to "previous release tag → HEAD"). Groups changes by Highlights /
+  Features / Fixes / Internal / Contributors. Level 0 pipeline.
 level: 0
 agent: agents/generator.md
 mcp:

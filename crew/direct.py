@@ -34,7 +34,7 @@ from typing import Any
 from copilot import CopilotClient
 from copilot.session import PermissionHandler
 
-from crew.streamer import Streamer, TerminalStreamer
+from crew.streamer import Streamer
 
 DIRECT_SYSTEM_PROMPT = "You are a helpful team assistant."
 
@@ -101,7 +101,8 @@ async def run_direct(
     Copilot session; ``DirectResult.session_id`` (out) is what to remember
     for the next turn (it may differ if the SDK assigned a new id).
     """
-    s: Streamer = streamer if streamer is not None else TerminalStreamer()
+    if streamer is None:
+        streamer = Streamer(mode="verbose")
 
     session_kwargs: dict[str, Any] = {
         "on_permission_request": PermissionHandler.approve_all,
@@ -117,12 +118,12 @@ async def run_direct(
 
     async with CopilotClient() as client:
         async with await client.create_session(**session_kwargs) as session:
-            session.on(s.handle_event)
+            session.on(streamer.handler)
             await session.send_and_wait(user_input)
-            s.finish_line()
             resolved_session_id = getattr(session, "session_id", None) or session_id or ""
+    text = streamer.finish()
 
     return DirectResult(
         session_id=resolved_session_id,
-        assistant_text=s.text.strip(),
+        assistant_text=text.strip(),
     )

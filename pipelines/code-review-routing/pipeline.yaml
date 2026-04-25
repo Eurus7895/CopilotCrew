@@ -1,11 +1,13 @@
 name: code-review-routing
 description: >
-  Given a PR, suggest the best reviewer(s) — ranked — with a one-sentence
-  rationale each. Uses CODEOWNERS, recent touches, and availability.
+  Recommend reviewers for an open pull request, ranked by file-overlap
+  and CODEOWNERS coverage with a one-line rationale per reviewer.
+  Level 1 pipeline — graded by an isolated evaluator and retried with
+  fix instructions on failure.
 level: 1
 agent: agents/generator.md
 evaluator: agents/evaluator.md
-schema: schemas/routing-verdict.json
+schema: schemas/review-routing.json
 mcp:
   - github
 allowed_tools:

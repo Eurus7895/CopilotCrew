@@ -23,11 +23,11 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from copilot import CopilotClient
-from copilot.generated.session_events import SessionEvent, SessionEventType
 from copilot.session import PermissionHandler
 
 from crew.agent_registry import AgentInfo
 from crew.pipeline_registry import PipelineInfo
+from crew.streamer import Streamer
 
 _log = logging.getLogger("crew.intent_router")
 
@@ -227,13 +227,7 @@ async def _call_router(
     *,
     model: str | None,
 ) -> str:
-    buffer: list[str] = []
-
-    def on_event(event: SessionEvent) -> None:
-        if event.type == SessionEventType.ASSISTANT_MESSAGE_DELTA:
-            delta = getattr(event.data, "delta_content", None)
-            if delta:
-                buffer.append(delta)
+    streamer = Streamer(mode="silent")
 
     async with CopilotClient() as client:
         async with await client.create_session(
@@ -243,9 +237,9 @@ async def _call_router(
             enable_config_discovery=False,
             system_message={"mode": "replace", "content": system_prompt},
         ) as session:
-            session.on(on_event)
+            session.on(streamer.handler)
             await session.send_and_wait(user_input)
-    return "".join(buffer)
+    return streamer.finish()
 
 
 async def route(

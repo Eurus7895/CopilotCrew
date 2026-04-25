@@ -21,7 +21,8 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from copilot import CopilotClient
-from copilot.generated.session_events import SessionEvent, SessionEventType
+
+from crew.streamer import Streamer
 
 _log = logging.getLogger("crew.evaluator")
 
@@ -143,15 +144,10 @@ async def evaluate(
     * uses a fresh ``CopilotClient`` (no shared state with the generator),
     * has ``enable_config_discovery=False`` (no MCP, no skills),
     * passes no permission handler (no tools at all),
-    * captures deltas to a buffer (does NOT stream to stdout).
+    * captures deltas to a buffer via ``Streamer(mode="silent")`` (does
+      NOT stream to stdout).
     """
-    buffer: list[str] = []
-
-    def on_event(event: SessionEvent) -> None:
-        if event.type == SessionEventType.ASSISTANT_MESSAGE_DELTA:
-            delta = getattr(event.data, "delta_content", None)
-            if delta:
-                buffer.append(delta)
+    streamer = Streamer(mode="silent")
 
     system_message = _build_system_message(evaluator_prompt, schema_text)
     user_message = _USER_ENVELOPE.format(output=output_text)
@@ -163,7 +159,7 @@ async def evaluate(
             enable_config_discovery=False,
             system_message=system_message,
         ) as session:
-            session.on(on_event)
+            session.on(streamer.handler)
             await session.send_and_wait(user_message)
 
-    return _parse_verdict("".join(buffer))
+    return _parse_verdict(streamer.finish())

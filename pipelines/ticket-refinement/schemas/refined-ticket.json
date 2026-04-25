@@ -1,28 +1,42 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Refined ticket verdict",
-  "type": "object",
-  "required": ["status", "issues", "summary"],
-  "properties": {
-    "status": {
-      "type": "string",
-      "enum": ["pass", "fail", "escalate"]
+  "required_sections": [
+    "Title",
+    "Summary",
+    "User Story",
+    "Acceptance Criteria",
+    "Technical Notes",
+    "Effort Estimate",
+    "Stakeholders",
+    "Open Questions"
+  ],
+  "rules": [
+    {
+      "check": "ac_is_checklist_with_three_items",
+      "message": "The '## Acceptance Criteria' section MUST be a Markdown checklist (- [ ] ...) with at least three items, including one edge-case item."
     },
-    "summary": {
-      "type": "string",
-      "maxLength": 280
+    {
+      "check": "ac_is_user_facing",
+      "message": "Every acceptance-criteria item MUST be a testable, user-facing statement (Given/When/Then or 'The user can ...'), not an implementation note."
     },
-    "issues": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["severity", "description", "fix_instruction"],
-        "properties": {
-          "severity": { "type": "string", "enum": ["minor", "major", "critical"] },
-          "description": { "type": "string" },
-          "fix_instruction": { "type": "string" }
-        }
-      }
+    {
+      "check": "user_story_persona_capability_outcome",
+      "message": "The '## User Story' section MUST follow the form 'As a <persona>, I want <capability>, so that <outcome>.' with all three slots filled."
+    },
+    {
+      "check": "effort_estimate_bucket_with_justification",
+      "message": "The '## Effort Estimate' section MUST be one of 'S', 'M', 'L', or 'Unknown', followed by a one-sentence justification. 'Unknown' MUST come with at least one entry under '## Open Questions'."
+    },
+    {
+      "check": "stakeholders_real_or_placeholder",
+      "message": "The '## Stakeholders' section MUST contain real @handles taken from the issue or its comments, OR the literal placeholder '- (none identified)'. Do NOT invent handles."
+    },
+    {
+      "check": "no_invented_activity",
+      "message": "If a GitHub MCP call returned no results, the draft MUST say so explicitly. The generator MUST NOT fabricate issue content, comments, linked PRs, or stakeholders."
+    },
+    {
+      "check": "ticket_is_short",
+      "message": "The whole draft MUST stay under 450 words."
     }
-  }
+  ]
 }

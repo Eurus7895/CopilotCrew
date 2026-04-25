@@ -128,3 +128,50 @@ def test_load_pipeline_missing_schema_file_raises(tmp_path: Path) -> None:
 
     with pytest.raises(FileNotFoundError, match="schema file missing"):
         pipeline_registry.load_pipeline("demo-l1", pipelines_dir=dst_root)
+
+
+# ── v1 pipeline-set regression (Day 4-B) ─────────────────────────────────────
+
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+REAL_PIPELINES_DIR = REPO_ROOT / "pipelines"
+
+V1_PIPELINES: dict[str, int] = {
+    "daily-standup": 0,
+    "release-notes": 0,
+    "incident-triage": 1,
+    "ticket-refinement": 1,
+    "code-review-routing": 1,
+}
+
+
+def test_v1_pipelines_all_discoverable() -> None:
+    """All five v1 pipelines (CLAUDE.md "Build Order") must be present
+    and at the right level. Catches accidental drops or misconfiguration.
+    """
+    infos = pipeline_registry.discover(REAL_PIPELINES_DIR)
+    by_name = {i.name: i for i in infos}
+    for name, expected_level in V1_PIPELINES.items():
+        assert name in by_name, f"v1 pipeline {name!r} missing from pipelines/"
+        assert by_name[name].level == expected_level, (
+            f"{name}: expected level {expected_level}, got {by_name[name].level}"
+        )
+
+
+def test_v1_pipelines_all_load_cleanly() -> None:
+    """Each v1 pipeline must fully resolve: agent prompt, evaluator (Level
+    1), schema (Level 1), and at least one MCP server declaration.
+    """
+    for name, expected_level in V1_PIPELINES.items():
+        cfg = pipeline_registry.load_pipeline(
+            name, pipelines_dir=REAL_PIPELINES_DIR, repo_root=REPO_ROOT
+        )
+        assert cfg.agent_prompt.strip(), f"{name}: empty agent prompt"
+        assert cfg.mcp_servers, f"{name}: no MCP servers loaded"
+        if expected_level >= 1:
+            assert cfg.evaluator_prompt, f"{name}: Level 1 missing evaluator prompt"
+            assert cfg.schema_text, f"{name}: Level 1 missing schema text"
+        else:
+            assert cfg.evaluator_prompt is None, (
+                f"{name}: Level 0 unexpectedly has an evaluator"
+            )
