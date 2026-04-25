@@ -1,6 +1,0 @@
-{
-  "required_sections": ["Summary"],
-  "rules": [
-    "The output MUST contain a `## Summary` heading."
-  ]
-}
