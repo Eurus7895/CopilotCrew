@@ -1,4 +1,0 @@
-{"fact": "Priya prefers fail-closed evaluator", "ts": "2026-04-22T15:10:00Z", "source": "1:1 notes"}
-{"fact": "#421 author @alex-p is new (onboarded Mar 12)", "ts": "2026-04-22T09:02:00Z", "source": "onboarding tracker"}
-{"fact": "Flaky test is macOS-only, ~1 in 4 runs", "ts": "2026-04-21T18:45:00Z", "source": "CI review"}
-{"fact": "You estimated Day 3 at 2 hours", "ts": "2026-04-20T08:00:00Z", "source": "plan file"}
