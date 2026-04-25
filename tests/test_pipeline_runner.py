@@ -359,3 +359,52 @@ def test_level_1_pipeline_never_passes_session_id(monkeypatch, tmp_path: Path) -
             assert "session_id" not in session.kwargs, (
                 "Level 1 generator + evaluator must never resume sessions"
             )
+
+
+# ── Streamer wiring (Day 4-B) ────────────────────────────────────────────────
+
+
+def test_run_level_0_summary_mode_prints_status_not_tokens(
+    monkeypatch, tmp_path: Path, capsys
+) -> None:
+    monkeypatch.setattr(
+        pipeline_runner,
+        "CopilotClient",
+        make_fake_copilot_client(reply="## Yesterday\n- did things\n"),
+    )
+
+    config = pipeline_registry.load_pipeline(
+        "demo", pipelines_dir=FIXTURES_PIPELINES, repo_root=tmp_path
+    )
+    result = _run(
+        pipeline_runner.run_level_0(
+            config, "go", crew_home=tmp_path, stream_mode="summary"
+        )
+    )
+
+    captured = capsys.readouterr()
+    # No raw tokens in stdout — just summary-mode status lines.
+    assert "did things" not in captured.out
+    assert "[demo] generating" in captured.out
+    assert "[demo] done" in captured.out
+    # The output file still gets the full generator text.
+    assert "did things" in result.output_path.read_text()
+
+
+def test_run_level_0_verbose_mode_streams_tokens(
+    monkeypatch, tmp_path: Path, capsys
+) -> None:
+    monkeypatch.setattr(
+        pipeline_runner,
+        "CopilotClient",
+        make_fake_copilot_client(reply="streamed body text"),
+    )
+
+    config = pipeline_registry.load_pipeline(
+        "demo", pipelines_dir=FIXTURES_PIPELINES, repo_root=tmp_path
+    )
+    _run(pipeline_runner.run_level_0(config, "go", crew_home=tmp_path))
+
+    captured = capsys.readouterr()
+    # Verbose is the default — tokens land in stdout.
+    assert "streamed body text" in captured.out

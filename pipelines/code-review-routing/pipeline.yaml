@@ -1,0 +1,16 @@
+name: code-review-routing
+description: >
+  Recommend reviewers for an open pull request, ranked by file-overlap
+  and CODEOWNERS coverage with a one-line rationale per reviewer.
+  Level 1 pipeline — graded by an isolated evaluator and retried with
+  fix instructions on failure.
+level: 1
+agent: agents/generator.md
+evaluator: agents/evaluator.md
+schema: schemas/review-routing.json
+mcp:
+  - github
+allowed_tools:
+  - read
+  - mcp
+output_subdir: code-review-routing

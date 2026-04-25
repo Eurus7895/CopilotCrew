@@ -647,16 +647,49 @@ Implementation notes:
 
 ### Day 4-B — Streaming + remaining pipelines
 ```
-[ ] streamer.py: terminal output + summary mode
-[ ] ticket-refinement, code-review-routing, release-notes
-[ ] Test all 5 pipelines end-to-end on real team data
+[x] streamer.py: terminal output + summary mode
+[x] ticket-refinement, code-review-routing, release-notes
 ```
+
+Implementation notes:
+
+* `crew/streamer.py` consolidates the `on_event` handler that every
+  Copilot session used to re-implement (direct mode, pipeline runner,
+  evaluator, intent router). One `Streamer` class with three modes:
+  `verbose` (stream tokens to stdout — direct / agent / slash),
+  `summary` (terse status lines: generating / tool / done N chars —
+  pipelines under `--summary`), `silent` (capture-only — evaluator
+  + router). Tool-execution events fan out to optional
+  `on_tool_start` / `on_tool_end` callbacks so the pipeline runner
+  can keep firing `pre-tool-use` / `post-tool-use` hooks without
+  re-implementing the event-type dispatch.
+* `crew --pipeline --summary "…"` is the user-facing flag. The
+  generated output file is identical in both modes — `--summary` only
+  changes what lands on the terminal, so cron / CI invocations can
+  keep logs readable without giving up the audit trail.
+* Three new pipelines complete the v1 set of five:
+  * `release-notes` (Level 0) — drafts release notes from merged PRs
+    between two refs, bucketed Highlights / Features / Fixes /
+    Internal-Chores / Contributors.
+  * `ticket-refinement` (Level 1) — refines a thin GitHub issue into a
+    structured draft (Title / Summary / User Story / AC / Technical
+    Notes / Effort / Stakeholders / Open Questions). Evaluator's
+    hardest-to-fake rule is `ac_is_user_facing` — AC items must read as
+    user-observable behaviour, not implementation bullets.
+  * `code-review-routing` (Level 1) — recommends ranked reviewers for
+    an open PR, citing CODEOWNERS rules or recent PR authorship as
+    rationale per reviewer; excludes PR author + bots.
+* End-to-end live-data exercise of all five pipelines is moved to
+  Day 5 — it needs live MCP credentials and a real team repo, and
+  folds naturally into the first-team-member rollout. Each pipeline
+  ships with discovery + load coverage in the unit-test suite.
 
 ### Day 5 — Hardening + first team member
 ```
 [ ] Baseline checks in session-start hook
 [ ] crew logs, crew status, crew resume
 [ ] README: install in 5 minutes
+[ ] Test all 5 pipelines end-to-end on real team data (moved from Day 4-B)
 [ ] Give to 1 team member. Watch. Take notes.
 ```
 
@@ -767,6 +800,8 @@ architecture primitives, different execution model.
 
 *Updated: April 2026*
 *Product: Crew*
-*Phase: Day 4-A shipped; Day 4-B next*
+*Phase: Day 4 complete (4-A + 4-B); Day 5 hardening next*
 *First user: Current team*
-*Next: Day 4-B — streamer + remaining pipelines (ticket-refinement, code-review-routing, release-notes)*
+*Next: Day 5 — baseline session-start checks, `crew logs/status/resume`,
+README, end-to-end shakedown of all five pipelines on real team data,
+hand to first team member*

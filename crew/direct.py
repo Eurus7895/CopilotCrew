@@ -28,13 +28,13 @@ artifacts must survive context resets).
 
 from __future__ import annotations
 
-import sys
 from dataclasses import dataclass
 from typing import Any
 
 from copilot import CopilotClient
-from copilot.generated.session_events import SessionEvent, SessionEventType
 from copilot.session import PermissionHandler
+
+from crew.streamer import Streamer
 
 DIRECT_SYSTEM_PROMPT = "You are a helpful team assistant."
 
@@ -95,15 +95,7 @@ async def run_direct(
     Copilot session; ``DirectResult.session_id`` (out) is what to remember
     for the next turn (it may differ if the SDK assigned a new id).
     """
-    buffer: list[str] = []
-
-    def on_event(event: SessionEvent) -> None:
-        if event.type == SessionEventType.ASSISTANT_MESSAGE_DELTA:
-            delta = getattr(event.data, "delta_content", None)
-            if delta:
-                sys.stdout.write(delta)
-                sys.stdout.flush()
-                buffer.append(delta)
+    streamer = Streamer(mode="verbose")
 
     session_kwargs: dict[str, Any] = {
         "on_permission_request": PermissionHandler.approve_all,
@@ -119,13 +111,12 @@ async def run_direct(
 
     async with CopilotClient() as client:
         async with await client.create_session(**session_kwargs) as session:
-            session.on(on_event)
+            session.on(streamer.handler)
             await session.send_and_wait(user_input)
-            sys.stdout.write("\n")
-            sys.stdout.flush()
             resolved_session_id = getattr(session, "session_id", None) or session_id or ""
+    text = streamer.finish()
 
     return DirectResult(
         session_id=resolved_session_id,
-        assistant_text="".join(buffer).strip(),
+        assistant_text=text.strip(),
     )
