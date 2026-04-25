@@ -100,36 +100,41 @@ See CLAUDE.md "Agent Complexity Model" and "Phase 5 — Plugin Marketplace".
 
 ## Build status
 
-**Day 4-B pipelines shipped.** All five v1 pipelines are now in
-`pipelines/`: `standup` and `release-notes` (Level 0); `incident-triage`,
-`ticket-refinement`, and `code-review-routing` (Level 1 with isolated
-evaluator + correction loop). Each Level 1 pipeline has a JSON schema
-under `schemas/` that the evaluator grades against. The intent router
-discovers them automatically — no registry edits needed.
+**Day 4 complete (4-A + 4-B).** Crew now has bounded session
+continuity for chatty modes, a unified streamer, and the full v1 set
+of five pipelines.
 
-**Day 4-B streamer shipped.** `crew/streamer.py` consolidates the
-previously-duplicated `on_event` handler into one `Streamer` class with
-three modes (`verbose` / `summary` / `silent`). `crew --pipeline
---summary "…"` replaces token-by-token streaming with terse status
-lines (generator start, per-tool call, final char count) for cron / CI /
-log-file invocations — the pipeline's output file is identical either
-way.
-
-**Day 4-A shipped.** Bounded session continuity for chatty modes:
-`crew/conversations.py` persists the per-scope Copilot `session_id` in
-`~/.crew/sessions.json` and appends every turn to a rotation-input log;
-once `CREW_TURN_CAP` is hit, the next call silently summarises the tail
-(via `CREW_SUMMARY_MODEL` when set, else the user's model), starts a
-fresh SDK session seeded with the summary, and marks the rotation in
-the log. One user-facing flag: `--new` to force fresh. Pipelines + the
-evaluator stay one-shot — guarded by runtime tests asserting no
-`session_id` is ever passed to `create_session` from the runner.
+* **Day 4-B pipelines.** All five v1 pipelines are in `pipelines/`:
+  `standup` and `release-notes` (Level 0); `incident-triage`,
+  `ticket-refinement`, and `code-review-routing` (Level 1 with isolated
+  evaluator + correction loop). Each Level 1 pipeline has a JSON schema
+  under `schemas/` that the evaluator grades against. The intent router
+  discovers them automatically — no registry edits needed.
+* **Day 4-B streamer.** `crew/streamer.py` consolidates the
+  previously-duplicated `on_event` handler into one `Streamer` class
+  with three modes (`verbose` / `summary` / `silent`). `crew
+  --pipeline --summary "…"` replaces token-by-token streaming with
+  terse status lines (generator start, per-tool call, final char
+  count) for cron / CI / log-file invocations — the pipeline's output
+  file is identical either way.
+* **Day 4-A.** Bounded session continuity for chatty modes:
+  `crew/conversations.py` persists the per-scope Copilot `session_id`
+  in `~/.crew/sessions.json` and appends every turn to a
+  rotation-input log; once `CREW_TURN_CAP` is hit, the next call
+  silently summarises the tail (via `CREW_SUMMARY_MODEL` when set,
+  else the user's model), starts a fresh SDK session seeded with the
+  summary, and marks the rotation in the log. One user-facing flag:
+  `--new` to force fresh. Pipelines + the evaluator stay one-shot —
+  guarded by runtime tests asserting no `session_id` is ever passed
+  to `create_session` from the runner.
 
 Earlier days, in order: Day 2 (pipeline runner + hooks +
-`daily-standup`), Day 2.5 (3-way router + `agents/` directory), Day 2.8
-(slash commands invoke skills; `skills/debug/`), Day 3 (Level 1 pipelines
-with isolated evaluator + correction loop; `incident-triage`), `/help`
-(zero-LLM registry listing). Day 4-B's remaining open item is the
-end-to-end shakedown of all five pipelines on real team data — that
-needs live MCP credentials + a real repo and folds naturally into the
-Day 5 first-team-member rollout.
+`daily-standup`), Day 2.5 (3-way router + `agents/` directory),
+Day 2.8 (slash commands invoke skills; `skills/debug/`), Day 3
+(Level 1 pipelines with isolated evaluator + correction loop;
+`incident-triage`), `/help` (zero-LLM registry listing).
+
+**Day 5 is next** — baseline session-start checks, `crew logs`,
+`crew status`, `crew resume`, README, end-to-end shakedown of all
+five pipelines on real team data (moved from Day 4-B), and handing
+the tool to the first team member.

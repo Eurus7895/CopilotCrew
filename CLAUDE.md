@@ -649,7 +649,6 @@ Implementation notes:
 ```
 [x] streamer.py: terminal output + summary mode
 [x] ticket-refinement, code-review-routing, release-notes
-[ ] Test all 5 pipelines end-to-end on real team data
 ```
 
 Implementation notes:
@@ -680,16 +679,17 @@ Implementation notes:
   * `code-review-routing` (Level 1) — recommends ranked reviewers for
     an open PR, citing CODEOWNERS rules or recent PR authorship as
     rationale per reviewer; excludes PR author + bots.
-* End-to-end tests on real team data — the third Day 4-B item — stay
-  open. Each pipeline ships with discovery + load coverage in the
-  unit tests, but the full generator/evaluator loop against live
-  GitHub MCP is a Day 5 / first-team-member exercise.
+* End-to-end live-data exercise of all five pipelines is moved to
+  Day 5 — it needs live MCP credentials and a real team repo, and
+  folds naturally into the first-team-member rollout. Each pipeline
+  ships with discovery + load coverage in the unit-test suite.
 
 ### Day 5 — Hardening + first team member
 ```
 [ ] Baseline checks in session-start hook
 [ ] crew logs, crew status, crew resume
 [ ] README: install in 5 minutes
+[ ] Test all 5 pipelines end-to-end on real team data (moved from Day 4-B)
 [ ] Give to 1 team member. Watch. Take notes.
 ```
 
@@ -800,6 +800,8 @@ architecture primitives, different execution model.
 
 *Updated: April 2026*
 *Product: Crew*
-*Phase: Day 4-B all five pipelines shipped; live-data shakedown next*
+*Phase: Day 4 complete (4-A + 4-B); Day 5 hardening next*
 *First user: Current team*
-*Next: end-to-end run of all five pipelines on real team data, then Day 5*
+*Next: Day 5 — baseline session-start checks, `crew logs/status/resume`,
+README, end-to-end shakedown of all five pipelines on real team data,
+hand to first team member*
