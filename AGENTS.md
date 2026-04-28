@@ -1,7 +1,10 @@
 # AGENTS.md — Crew session-start orientation
 
-You are working in **Crew**, a terminal-native virtual assistant powered by
-the Copilot SDK. Read `CLAUDE.md` for the full design doc.
+You are working in **Crew**, a terminal-native virtual assistant powered
+by the Copilot SDK. Read `CLAUDE.md` for operational rules + invariants;
+`docs/ARCHITECTURE.md` for how it works; `docs/API.md` for hook + MCP
+schemas; `CHANGELOG.md` for completed work; `ROADMAP.md` for what's
+next.
 
 ## Project shape
 
@@ -121,7 +124,8 @@ bundle's directory into the project; the skill registry already supports
 multiple search roots, so `plugins/<plugin-name>/skills/` will be picked
 up automatically once the install command lands.
 
-See CLAUDE.md "Agent Complexity Model" and "Phase 5 — Plugin Marketplace".
+See `docs/ARCHITECTURE.md` "Agent Complexity Model" and `ROADMAP.md`
+"Phase 5 — Plugin Marketplace".
 
 ## Build status
 
