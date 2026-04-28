@@ -3,6 +3,13 @@
 What's next, what's known-broken, and the long-term evolution path.
 Completed work lives in `CHANGELOG.md`.
 
+**Day-N vs Phase-N.** "Day" refers to the v1 build sprint sequence
+(Day 1 → Day 5); each Day is a tight, dated milestone. "Phase" refers
+to post-v1 evolution buckets (Phase 2 onward) with no fixed dates —
+they exist to record decisions made now about future work, not
+commitments. Day 5 is the final v1 Day; everything beyond it is a
+Phase.
+
 ---
 
 ## Day 5 — Hardening + first team member (next)
