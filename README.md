@@ -1,7 +1,15 @@
 # Crew
 
-Terminal-native virtual assistant powered by the Copilot SDK. See `CLAUDE.md`
-for the full design doc and `AGENTS.md` for session-start orientation.
+Terminal-native virtual assistant powered by the Copilot SDK.
+
+| Doc | Purpose |
+|---|---|
+| `CLAUDE.md` | Operational rules, invariants, commands |
+| `AGENTS.md` | Session-start map (project shape) |
+| `CHANGELOG.md` | Completed work, week by week |
+| `ROADMAP.md` | Day 5, known TODOs, evolution path, risks |
+| `docs/ARCHITECTURE.md` | How it works, file layout, GUI rendering |
+| `docs/API.md` | Frontmatter, hooks, MCP, policy schemas |
 
 ## Status
 
@@ -184,6 +192,19 @@ working-on chips) read from JSONL files seeded into `~/.crew/gui/` and
 `~/.crew/memory.jsonl` on first launch. Edit them by hand or let future
 hooks/pipelines append — the window picks up changes on the next
 request. Internal server binds `127.0.0.1` only; no auth in v1.
+
+## Boundaries
+
+**vs AgentShield.** AgentShield secures individual tool calls. Crew
+governs what a pipeline produces across a full workflow.
+
+**vs CopilotHarness.** IDE-native for coding. Crew is terminal-native
+for team workflows. Same harness core. Different surfaces.
+
+**vs Claude Code.** Freeform agentic chat with plugins. Crew is
+governed pipelines — every team-workflow request maps to a structured
+pipeline with an isolated evaluator. Same plugin architecture
+primitives, different execution model.
 
 ## Tests
 
