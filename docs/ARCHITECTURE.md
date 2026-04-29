@@ -1,63 +1,13 @@
 # Architecture — Crew
 
-How Crew works under the hood. For operational rules see `../CLAUDE.md`;
-for hook + MCP schemas see `./API.md`.
+How Crew works under the hood. For the user-facing pitch (modes,
+boundaries, lineage) see [`../README.md`](../README.md); for operational
+rules see [`../CLAUDE.md`](../CLAUDE.md); for hook + MCP schemas see
+[`./API.md`](./API.md).
 
----
-
-## What Crew Is
-
-Two fundamental modes (chatty vs governed), one interface. The router
-decides which mode based on the request. The chatty side has two
-flavours — generic assistant (`direct`) and persona swap
-(`agent:{name}`); the router picks whichever matches best.
-
-```
-User types anything
-        ↓
-Intent Router (one LLM call)
-  classifies: direct | agent:{name} | pipeline:{name}
-        ↓
-  ┌─────────────────────┬────────────────────────────────┐
-  │  DIRECT MODE        │  PIPELINE MODE                 │
-  │                     │                                │
-  │  Simple request     │  Complex workflow              │
-  │  Single LLM call    │  Governed pipeline             │
-  │  No schema, no      │  Agents + evaluator +          │
-  │  evaluator, no      │  validation + correction       │
-  │  plan JSON          │  + plan JSON + audit           │
-  │                     │                                │
-  │  "what's our        │  "standup prep"                │
-  │   sprint velocity?" │  "triage the API outage"       │
-  │  "explain this      │  "refine PROJ-123"             │
-  │   error message"    │  "release notes for v2.1"      │
-  │  "how do I run      │  "who should review PR-421"    │
-  │   the migrations?"  │                                │
-  │                     │                                │
-  │  Fast. Lightweight. │  Governed. Auditable.          │
-  │  No overhead.       │  Reliable.                     │
-  └─────────────────────┴────────────────────────────────┘
-        ↓
-Streaming terminal output
-```
-
-The router decides; the user can force either mode with `--direct` /
-`--pipeline` / `--agent NAME`. Slash commands (`/standup`, `/debug`)
-bypass the router — deterministic fast path.
-
----
-
-## Origin & Lineage
-
-```
-CopilotHarness              Crew                     Claude Code
-──────────────────────     ──────────────────────    ──────────────────
-VS Code only               Terminal                  Terminal
-Code tasks only             Any team workflow         Any coding task
-Hardcoded 5-stage           Direct + pipelines        Freeform + plugins
-VS Code LM API              Copilot SDK (BYOK)        Anthropic API
-MCP server                  Plugin architecture       Plugin architecture
-```
+This document covers internals: the primitives Crew adapts from Claude
+Code, context management, the evaluator pattern, the harness core, and
+GUI rendering.
 
 ---
 
